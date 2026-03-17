@@ -1,0 +1,19 @@
+{
+  "name": "erp-siniestros-hogar",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.5.0",
+  "scripts": {
+    "dev:api": "pnpm --filter @erp/edge-api dev",
+    "dev:web": "pnpm --filter @erp/backoffice-web dev",
+    "dev:pwa": "pnpm --filter @erp/operator-pwa dev",
+    "dev": "pnpm run --parallel dev:api dev:web",
+    "dev:all": "pnpm run --parallel dev:api dev:web dev:pwa",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test:api": "pnpm --filter @erp/edge-api test",
+    "test:watch:api": "pnpm --filter @erp/edge-api test:watch",
+    "test": "pnpm run test:api",
+    "test:watch": "pnpm run test:watch:api"
+  }
+}

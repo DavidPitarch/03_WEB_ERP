@@ -1,0 +1,119 @@
+/* ─── Reset & Variables ─── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f1f5f9; --surface: #ffffff; --border: #e2e8f0;
+  --text: #1e293b; --muted: #64748b;
+  --primary: #2563eb; --primary-dark: #1d4ed8;
+  --danger: #ef4444; --success: #22c55e; --warning: #f59e0b;
+  --radius: 8px;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+
+/* ─── Layout ─── */
+.op-layout { min-height: 100vh; display: flex; flex-direction: column; max-width: 480px; margin: 0 auto; }
+.op-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: var(--primary); color: white; position: sticky; top: 0; z-index: 50; }
+.op-logo { font-weight: 700; font-size: 1rem; }
+.op-header-right { display: flex; align-items: center; gap: 0.5rem; }
+.op-sync-badge { background: var(--warning); color: #000; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.65rem; font-weight: 600; }
+.op-offline-badge { background: var(--danger); color: white; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.65rem; font-weight: 600; animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+.op-btn-logout { background: rgba(255,255,255,.2); border: none; color: white; padding: 0.3rem 0.6rem; border-radius: var(--radius); font-size: 0.75rem; cursor: pointer; }
+.op-main { flex: 1; padding: 0.75rem; padding-bottom: 4rem; }
+.op-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); display: flex; justify-content: center; padding: 0.5rem; max-width: 480px; margin: 0 auto; }
+.op-nav-item { padding: 0.5rem 1.5rem; font-size: 0.8rem; color: var(--muted); font-weight: 500; }
+.op-nav-item.active { color: var(--primary); }
+
+/* ─── Login ─── */
+.op-login { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1rem; }
+.op-login-card { background: var(--surface); padding: 2rem; border-radius: 12px; width: 100%; max-width: 360px; box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+.op-login-card h1 { font-size: 1.2rem; margin-bottom: 0.25rem; }
+.op-login-card p { color: var(--muted); margin-bottom: 1.5rem; font-size: 0.85rem; }
+.op-login-card input { width: 100%; padding: 0.6rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.9rem; margin-bottom: 0.75rem; }
+
+/* ─── Buttons ─── */
+.op-btn-primary { background: var(--primary); color: white; border: none; padding: 0.6rem 1rem; border-radius: var(--radius); cursor: pointer; font-size: 0.9rem; font-weight: 500; width: 100%; }
+.op-btn-primary:hover { background: var(--primary-dark); }
+.op-btn-primary:disabled { opacity: 0.6; }
+.op-btn-secondary { background: var(--surface); border: 1px solid var(--border); padding: 0.4rem 0.75rem; border-radius: var(--radius); cursor: pointer; font-size: 0.8rem; }
+.op-btn-sm { width: auto; padding: 0.35rem 0.75rem; font-size: 0.8rem; }
+.op-btn-full { width: 100%; margin-top: 1rem; }
+.op-btn-upload { width: 100%; padding: 0.75rem; border: 2px dashed var(--border); background: var(--bg); border-radius: var(--radius); cursor: pointer; font-size: 0.85rem; color: var(--primary); font-weight: 500; }
+
+/* ─── Agenda ─── */
+.op-agenda-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+.op-agenda-header h2 { font-size: 1.1rem; }
+.op-date-input { padding: 0.3rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.8rem; }
+.op-agenda-group { margin-bottom: 1rem; }
+.op-agenda-date { font-size: 0.85rem; color: var(--primary); margin-bottom: 0.5rem; text-transform: capitalize; }
+
+/* ─── Cita card ─── */
+.op-cita-card { display: block; background: var(--surface); border-radius: var(--radius); padding: 0.75rem; margin-bottom: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.op-cita-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
+.op-cita-time { font-weight: 600; font-size: 0.85rem; }
+.op-cita-ref { font-size: 0.75rem; color: var(--muted); }
+.op-cita-body { font-size: 0.8rem; }
+.op-cita-type { border-left: 3px solid; padding-left: 0.5rem; margin-bottom: 0.25rem; font-weight: 500; }
+.op-cita-address { color: var(--muted); }
+.op-cita-client { color: var(--muted); font-size: 0.75rem; margin-top: 0.15rem; }
+
+/* ─── Badges ─── */
+.op-badge { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600; background: #e2e8f0; color: var(--text); margin-left: 0.25rem; }
+.op-badge-done { background: #dcfce7; color: #166534; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600; }
+.op-badge-programada { background: #dbeafe; color: #1d4ed8; }
+.op-badge-confirmada { background: #dcfce7; color: #166534; }
+.op-badge-realizada { background: #f3f4f6; color: #4b5563; }
+
+/* ─── Claim detail ─── */
+.op-claim-detail { padding-bottom: 5rem; }
+.op-claim-header { margin-bottom: 0.75rem; }
+.op-claim-header h2 { font-size: 1.1rem; display: inline; margin-right: 0.5rem; }
+.op-section { background: var(--surface); border-radius: var(--radius); padding: 0.75rem; margin-bottom: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.op-section h3 { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.35rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.op-desc { font-size: 0.85rem; }
+.op-client-name { font-weight: 600; margin-bottom: 0.35rem; }
+.op-quick-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.35rem; }
+.op-action-btn { display: inline-block; padding: 0.35rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.8rem; color: var(--primary); font-weight: 500; cursor: pointer; }
+.op-cita-mini { padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+.op-cita-mini:last-child { border-bottom: none; }
+.op-parte-mini { padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
+.op-bottom-action { position: fixed; bottom: 3.5rem; left: 0; right: 0; padding: 0.75rem; background: var(--surface); border-top: 1px solid var(--border); max-width: 480px; margin: 0 auto; }
+
+/* ─── Part form ─── */
+.op-part-form { padding-bottom: 2rem; }
+.op-part-form h2 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+.op-part-summary { background: var(--surface); padding: 0.75rem; border-radius: var(--radius); margin-bottom: 0.75rem; font-size: 0.85rem; }
+.op-field { margin-bottom: 0.75rem; }
+.op-field label { display: block; font-size: 0.8rem; font-weight: 500; margin-bottom: 0.25rem; }
+.op-field textarea, .op-field input[type="text"] { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.85rem; font-family: inherit; resize: vertical; }
+.op-field select { width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.85rem; }
+.op-checkbox-label { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer; }
+.op-result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; }
+.op-result-btn { padding: 0.5rem; border: 2px solid var(--border); border-radius: var(--radius); background: var(--surface); cursor: pointer; font-size: 0.8rem; font-weight: 500; }
+.op-result-btn.active { border-color: var(--primary); background: #eff6ff; color: var(--primary); }
+
+/* ─── Evidence ─── */
+.op-evidence { margin: 0.75rem 0; }
+.op-evidence-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+.op-evidence-header h3 { font-size: 0.85rem; margin: 0; }
+.op-select-sm { padding: 0.25rem 0.4rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.75rem; }
+.op-evidence-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem; margin-top: 0.5rem; }
+.op-evidence-item { position: relative; border-radius: var(--radius); overflow: hidden; aspect-ratio: 1; background: var(--bg); }
+.op-evidence-thumb { width: 100%; height: 100%; object-fit: cover; }
+.op-evidence-file { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 0.65rem; color: var(--muted); padding: 0.25rem; text-align: center; }
+.op-evidence-label { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.6); color: white; font-size: 0.6rem; padding: 0.15rem 0.3rem; text-align: center; }
+.op-evidence-remove { position: absolute; top: 2px; right: 2px; background: var(--danger); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 0.75rem; cursor: pointer; line-height: 1; }
+
+/* ─── Signature ─── */
+.op-signature { margin: 0.75rem 0; }
+.op-signature-label { font-size: 0.85rem; font-weight: 500; margin-bottom: 0.25rem; }
+.op-signature-canvas { width: 100%; height: 150px; border: 2px solid var(--border); border-radius: var(--radius); background: white; touch-action: none; cursor: crosshair; }
+.op-signature-actions { display: flex; gap: 0.5rem; margin-top: 0.35rem; justify-content: flex-end; }
+.op-firma-ok { color: var(--success); font-size: 0.8rem; font-weight: 500; margin-top: 0.25rem; }
+
+/* ─── Utility ─── */
+.op-loading { text-align: center; padding: 3rem; color: var(--muted); }
+.op-loading-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; color: var(--muted); }
+.op-empty { text-align: center; padding: 3rem; color: var(--muted); }
+.op-error { background: #fef2f2; color: var(--danger); padding: 0.5rem 0.75rem; border-radius: var(--radius); font-size: 0.8rem; margin: 0.5rem 0; }
+.op-muted { color: var(--muted); font-size: 0.8rem; }

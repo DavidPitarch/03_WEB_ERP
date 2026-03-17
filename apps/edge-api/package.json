@@ -1,0 +1,24 @@
+{
+  "name": "@erp/edge-api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "node ./scripts/run-vitest.mjs",
+    "test:watch": "node ./scripts/run-vitest.mjs --watch"
+  },
+  "dependencies": {
+    "hono": "^4.4.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "@erp/domain": "workspace:*",
+    "@erp/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240620.0",
+    "typescript": "^5.5.0",
+    "wrangler": "^3.60.0",
+    "vitest": "^2.0.0"
+  }
+}

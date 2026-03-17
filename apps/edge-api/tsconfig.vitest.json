@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "noEmitOnError": true,
+    "outDir": "./.vitest-dist",
+    "rootDir": "../..",
+    "sourceMap": false,
+    "types": ["vitest/globals", "@cloudflare/workers-types"],
+    "tsBuildInfoFile": "./.vitest-dist/.tsbuildinfo"
+  },
+  "include": [
+    "src",
+    "../../packages/domain/src",
+    "../../packages/types/src"
+  ],
+  "exclude": [
+    "node_modules",
+    ".vitest-dist",
+    "dist"
+  ]
+}

@@ -1,0 +1,582 @@
+DESSEARRLLO DE APP GESTION SINIESTROS PERITOS
+Aquí tienes una propuesta de prompt extenso, técnico y estructurado, diseñado específicamente para ser introducido en una herramienta de generación de código o arquitectura (como la que mencionas, Doodle Antigravity, asumiendo que es un entorno de desarrollo asistido por IA o low-code).
+Este prompt adopta el rol de un Arquitecto de Software Full-Stack y desglosa el sistema GESTION SINIESTROS descrito en las fuentes en módulos lógicos, estructuras de datos y flujos de automatización.
+
+--------------------------------------------------------------------------------
+Prompt para Desarrollo de Sistema de Gestión Integral 
+Rol del Sistema: Actúa como un Arquitecto de Software Senior y Desarrollador de Datos especializado en ERPs web y sistemas CRM para empresas de servicios y reparaciones de seguros.
+Objetivo: Generar la arquitectura, el esquema de base de datos y la lógica de frontend/backend para replicar "GESTION SINIESTROS" (Sistema de Comunicación Integrado). El sistema debe ser una aplicación web en la nube, sin instalación local, diseñada para gestionar el ciclo de vida completo de siniestros, reformas y mantenimiento.
+Instrucciones de Generación para Doodle Antigravity: Desarrolla el código y la estructura visual basándote en los siguientes módulos funcionales y requisitos técnicos extraídos de la documentación del proyecto:
+1. Módulo de Ingesta y Gestión de Expedientes (Core)
+• Funcionalidad: Crear un sistema de recepción automática de encargos provenientes de compañías de seguros y clientes particulares.
+• Estructura de Datos: La entidad Expediente debe integrar automáticamente los campos: Número de Referencia, Número de Póliza, DNI, Teléfonos, Dirección y Descripción del Daño.
+• Requisito de UI: Los datos deben ordenarse en campos separados y editables individualmente para correcciones directas,.
+• Lógica de Negocio:
+    ◦ El estado inicial del expediente debe ser "No Asignado".
+    ◦ Debe existir una "Bandeja de Pendientes" para encargos paralizados (ausencia de cliente, espera de peritación, secado, etc.) con filtrado por especialidad y cliente.
+2. Módulo de Comunicaciones y Trazabilidad (CRM)
+• Funcionalidad: Sistema de mensajería integrado que elimine el uso de correos externos.
+• Sub-Bandejas: Implementar una bandeja de comunicaciones segmentada por cada cliente corporativo.
+• Automatización:
+    ◦ Al enviar un mensaje desde el cuadro de seguimiento, el sistema debe inyectarlo automáticamente en la plataforma web o buzón del cliente externo.
+    ◦ Toda comunicación debe registrarse cronológicamente en el "Seguimiento del Expediente",.
+• Stakeholders: Permitir comunicación multidireccional entre tramitadores, operarios, asegurados, peritos y proveedores.
+3. Planificación Interactiva y Agenda (Scheduler)
+• UI del Planning: Crear un calendario visual (Plan Interactivo) que muestre la carga de trabajo semanal y horas disponibles por operario.
+• Funcionalidad de Citas:
+    ◦ Permitir seleccionar gremio/operario manteniendo visibles los datos del expediente.
+    ◦ Trigger de Automatización: Al fijar una fecha/hora ("Nueva Cita"), el sistema debe preguntar mediante modal si se desea notificar a la compañía.
+    ◦ Si se acepta, enviar notificación automática de "Primer Contacto" a la compañía y correo con detalles del encargo al profesional asignado.
+    ◦ Actualizar automáticamente el estado del expediente a "En Curso" tras asignar el tipo de daño.
+4. Portal del Operario y Movilidad (Web App)
+• Interfaz Móvil: Desarrollar una vista web responsiva para los técnicos de campo.
+• Funcionalidad:
+    ◦ Recepción de encargos asignados en tiempo real.
+    ◦ Envío de "Partes de Trabajo" firmados digitalmente y fotografías desde el domicilio del cliente.
+• Gestión de Informes:
+    ◦ Los informes recibidos aparecen instantáneamente en la "Bandeja de Informes de Operarios" del tramitador.
+    ◦ Implementar alertas de "Informes Caducados" para citas pasadas sin reporte de trabajo.
+5. Generación Documental y Multimedia
+• Motor de PDF: Generar partes físicos en PDF que integren automáticamente las fotos enviadas por el operario y apliquen dinámicamente el logotipo y estilo corporativo exigido por cada cliente (compañía de seguros).
+• Galería: Pestaña de "Documentos" accesible para tramitadores y operarios que centralice todas las imágenes y archivos del siniestro.
+6. Módulo de Facturación y Presupuestos
+• Flujo de Trabajo:
+    1. Carga de trabajos realizados seleccionando Especialidad > Epígrafe > Trabajo.
+    2. Validación visual: Los trabajos e informes finalizados se marcan en color verde.
+    3. Cambio de estado a "Finalizado" habilita la facturación,.
+• Automatización: Botón "Facturar y Enviar" que remite la factura al cliente mediante su protocolo específico.
+• Control de Cobros:
+    ◦ Bandeja "Pendientes de Facturar" (trabajos terminados no facturados).
+    ◦ Bandeja "Facturas Caducadas" (facturas enviadas sin pago tras un tiempo prudencial).
+7. Gestión de Proveedores y Materiales
+• Funcionalidad: Solicitar materiales indicando fecha límite de entrega. El proveedor recibe el pedido en su web app/correo.
+• Seguimiento:
+    ◦ Bandeja "Pedidos a Recoger": Cuando el proveedor confirma disponibilidad.
+    ◦ Bandeja "Pedidos Caducados": Alertas si se supera la fecha límite de entrega.
+8. Sistema de Tareas y Buscador Universal
+• Sistema de Alertas: Crear tareas/recordatorios (ej. "Llamar a las 3 PM") vinculados a expedientes o usuarios. Debe aparecer un aviso visual (bocadillo) persistente hasta su resolución, visible independientemente de la pantalla en la que se trabaje,.
+• Buscador Universal: Implementar búsqueda avanzada combinando parámetros (Nº expediente, teléfono, dirección, localidad) para localizar siniestros con información parcial (ej. "Sr. García" + "Valencia"),.
+9. Dashboard de Gerencia (BI)
+• Analítica: Panel de control en tiempo real que muestre:
+    ◦ Costes, rentabilidad y facturación.
+    ◦ Rendimiento y calidad de producción por operario y administrativo.
+    ◦ Comparativas anuales y carga de trabajo.
+• Exportación: Capacidad de exportar datos a Excel y ContaPlus.
+
+--------------------------------------------------------------------------------
+Notas para el Desarrollador (Contexto Adicional):
+• Tecnología: El sistema debe emular la capacidad de "nube" sin instalaciones locales, similar a la tecnología usada por plataformas como Facebook o Google, garantizando actualizaciones constantes sin costes adicionales por mejoras,.
+• UX/UI Philosophy: La interfaz debe ser intuitiva ("así de fácil, así de rápido"), evitando la duplicidad de tareas. Si el sistema puede automatizar un aviso (como informar de una cita a la compañía), debe hacerlo sin intervención manual,.
+• Seguridad y Datos: Asegurar que los datos estén disponibles en tiempo real y protegidos contra pérdidas ("nada se le puede despistar").
+
+--------------------------------------------------------------------------------
+Resumen de uso de las fuentes en este prompt:
+Este prompt integra la lógica de negocio completa del video: desde la ingesta de datos,, pasando por la planificación inteligente que dispara notificaciones,,, hasta la gestión de operarios en movilidad, y el cierre del ciclo con facturación automatizada y análisis de datos,,. Se ha puesto especial énfasis en las automatizaciones (avisos a compañías, integración de fotos) que se destacan como el valor diferencial del sistema
+
+
+
+--------------------------------------------------------------------------------
+PROMPT PARA ARCHITECTURA Y DESARROLLO FULL-STACK: SISTEMA GESTION SINIESTROS (EXTENDED EDITION)
+Rol: Actúa como un Lead Software Architect y Senior Data Engineer especializado en soluciones SaaS para el sector InsurTech (Seguros y Asistencia).
+Objetivo del Proyecto: Generar la especificación técnica completa (Backend, Frontend, Base de Datos y Lógica de Negocio) para replicar el sistema de gestión "GESTION SINIESTROS". El sistema debe ser una Web App Progresiva (PWA) en la nube, multi-tenant y reactiva.
+Requisito Crítico Adicional: Implementar un Módulo de Peritación Avanzado, permitiendo que los Peritos interactúen con el sistema con el mismo nivel de profundidad que los operarios y tramitadores.
+
+--------------------------------------------------------------------------------
+1. MODELADO DE DATOS Y ESQUEMA DE ENTIDADES (DATABASE SCHEMA)
+Define una base de datos relacional robusta con las siguientes entidades clave y sus relaciones:
+• Expediente (Entidad Maestra):
+    ◦ Debe ingerir y mapear automáticamente: Ref_Compañía, Num_Poliza, Asegurado_DNI, Dirección_Riesgo, Teléfonos (múltiples), Descripción_Daño.
+    ◦ Estados del Ciclo de Vida: No Asignado, Pendiente Cita, En Curso (Operario/Perito), Pendiente Material, Paralizado (Secado/Instrucciones Periciales), Finalizado, Facturado.
+    ◦ Debe permitir la edición "in-place" de cada campo individualmente.
+• Usuarios_Roles (RBAC):
+    ◦ Roles necesarios: ADMIN, TRAMITADOR, OPERARIO (Gremio), PROVEEDOR y PERITO.
+    ◦ Cada rol debe tener su propia vista de "Web App" móvil personalizada.
+• Comunicacion_Log (Trazabilidad):
+    ◦ Tabla inmutable que registre cronológicamente: emails enviados/recibidos, SMS, cambios de estado y notas internas.
+    ◦ Debe vincularse al ID_Expediente y mostrarse como un "Timeline" infinito.
+• Agenda_Planificacion:
+    ◦ Relación Expediente <-> Usuario <-> Fecha/Hora.
+    ◦ Debe detectar conflictos de horario (disponibilidad).
+2. LÓGICA DE NEGOCIO Y AUTOMATIZACIÓN (BACKEND TRIGGERS)
+Implementa los siguientes Event Listeners que reaccionen a cambios en la base de datos:
+A. Automatización de Ingesta y Asignación
+• Al recibir un JSON/XML de una aseguradora, crea el Expediente y colócalo en la bandeja "Asignaciones Nuevas".
+• La UI debe separar los datos en campos atómicos para evitar reescritura manual.
+B. Motor de Notificaciones (El "Cerebro" de GESTION SINIESTROS)
+• Trigger "Nueva Cita": Cuando un tramitador fije una fecha en el Planner:
+    1. Lanzar modal: "¿Notificar Primer Contacto a Compañía?".
+    2. Si TRUE: Inyectar mensaje en la API/Web de la compañía informando del contacto.
+    3. Enviar email automático al Operario o Perito con los detalles del encargo y botón de aceptación.
+    4. Cambiar estado del expediente a "En Curso" tras solicitar el "Tipo de Daño" específico.
+C. Lógica de Peritación (NUEVO MÓDULO EXTENDIDO)
+Diseña un flujo específico para el rol PERITO:
+• Solicitud de Peritación: Habilitar un estado "Pendiente de Peritación" o "Instrucciones Periciales" que detenga el flujo de reparación.
+• Cita Pericial: El Planner debe permitir asignar citas a Peritos igual que a gremios. Al agendar, notificar al asegurado de la visita del perito.
+• Entregables del Perito (Web App):
+    ◦ Interfaz móvil para subir: Acta de Tasación, Fotos de Daños y Valoración Económica.
+    ◦ Validación: El sistema debe requerir la "Validación Pericial" antes de que el presupuesto de reparación pueda ser aprobado.
+D. Gestión de Operarios y Movilidad
+• Firma Digital: La Web App del operario debe capturar firma del asegurado en pantalla.
+• Carga Multimedia: Las fotos subidas por el operario deben integrarse automáticamente en la pestaña "Documentos" del expediente.
+• Alertas de SLA:
+    ◦ Crear tarea cron (job) que revise citas pasadas sin informe.
+    ◦ Mover estos expedientes a la bandeja "Informes Caducados" si Fecha_Cita < NOW() y Estado_Informe == NULL.
+3. INTERFAZ DE USUARIO (FRONTEND UX)
+Diseña una interfaz SPA (Single Page Application) con los siguientes componentes críticos:
+• El Planner Interactivo:
+    ◦ Calendario tipo Gantt/Semanal visualizando la carga de trabajo por operario/perito.
+    ◦ Drag & Drop para asignar expedientes a huecos libres.
+    ◦ Al seleccionar un operario, mostrar sus horas disponibles vs. ocupadas.
+• Buscador Universal (ElasticSearch):
+    ◦ Barra de búsqueda global persistente.
+    ◦ Capacidad de filtrar por metadata cruzada: "Apellido" + "Localidad" + "Calle" (ej. "García" + "Valencia") para encontrar expedientes con información parcial.
+• Gestor de Tareas Flotantes (WebSockets):
+    ◦ Implementar sistema de notificaciones visuales tipo "Bocadillo" (Sticky Notes).
+    ◦ Si se crea una tarea "Llamar a las 15:00", el aviso debe persistir en pantalla sobre cualquier otra ventana hasta que se marque como resuelta.
+• Dashboard de Control (BI):
+    ◦ Gráficos en tiempo real de: Rentabilidad por expediente, Rendimiento de operarios y Tiempos medios de cierre.
+    ◦ Botón de exportación directa a Excel y formatos contables (ContaPlus).
+4. MÓDULO FINANCIERO Y DOCUMENTAL
+• Generador de Informes PDF:
+    ◦ Motor de renderizado que tome las fotos del operario/perito y genere un PDF maquetado con el logotipo y colores corporativos específicos de la Compañía Aseguradora asignada al expediente (Whitelabel dinámico).
+• Facturación Visual:
+    ◦ Sistema de check: Los trabajos e informes finalizados se marcan en VERDE.
+    ◦ Flujo: Selección de Especialidad > Epígrafe > Trabajo.
+    ◦ Bandejas de Control de Cobro:
+        ▪ Pendientes de Facturar: Trabajos terminados pero no facturados.
+        ▪ Facturas Caducadas: Facturas enviadas que han superado el tiempo de vencimiento sin pago.
+5. GESTIÓN DE PROVEEDORES
+• Sistema de pedidos de material con fecha límite.
+• Alertas automáticas en bandeja "Pedidos Caducados" si el proveedor no confirma entrega en la fecha estipulada.
+
+--------------------------------------------------------------------------------
+Nota Técnica para Antigravity: El código generado debe priorizar una arquitectura Serverless o de Microservicios para garantizar escalabilidad sin costes de infraestructura fija, emulando la filosofía de "cero instalaciones" y actualizaciones constantes descrita en la documentación. La seguridad de los datos es prioritaria ("nada se puede despistar").
+
+
+Tras analizar exhaustivamente el contenido del video de presentación del sistema GESTION SINIESTROS (Sistema de Comunicación Integrado), a continuación expongo un desglose detallado y profundo de todas sus funcionalidades, organizadas por módulos operativos y lógica de negocio.
+El sistema se define como una plataforma web en la nube ("cloud"), diseñada para empresas de reparaciones, servicios y asistencia, que elimina la necesidad de instalaciones locales y utiliza tecnología de actualización continua similar a la de Google o Facebook.
+Aquí están las funcionalidades detalladas:
+1. Ingesta Automatizada y Gestión de Expedientes
+El núcleo del sistema es la capacidad de recibir encargos sin intervención manual.
+• Recepción Automática: Los encargos (ya sean de compañías de seguros, particulares o sector servicios) se integran directamente en la pestaña "Asignaciones Nuevas".
+• Mapeo de Datos: El sistema lee la comunicación entrante y ordena automáticamente los datos en campos separados: Número de Referencia, Póliza, DNI, Teléfonos, Dirección y Descripción del Daño.
+• Edición Dinámica: Aunque los datos entran automáticos, cada campo es editable individualmente para correcciones rápidas.
+2. Módulo de Comunicaciones (CRM Integrado)
+GESTION SINIESTROS actúa como un puente directo con los clientes externos, eliminando el uso de correos electrónicos externos o webs de terceros.
+• Bandejas Por Cliente: Existe una "Bandeja de Comunicaciones" segmentada por cada cliente corporativo (Compañía A, Compañía B, etc.).
+• Trazabilidad Cronológica: Cada mensaje recibido se vincula al número de encargo original y se muestra cronológicamente en el "Seguimiento del Expediente".
+• Envío Automatizado: Al enviar un mensaje desde el cuadro de seguimiento, el sistema lo inyecta automáticamente en la plataforma web o buzón del cliente destinatario, registrando la acción en el historial.
+• Interconexión Total: Permite comunicación multidireccional entre tramitadores, operarios, asegurados, peritos y proveedores.
+3. Planificación Inteligente (Agenda Interactiva)
+El "Plan Interactivo" no es solo un calendario, sino un disparador de automatizaciones.
+• Visualización de Carga: Permite seleccionar un gremio u operario y ver su carga de trabajo semanal y horas disponibles antes de asignar.
+• Automatización "Nueva Cita": Al fijar una hora en el calendario:
+    1. El sistema pregunta si se desea notificar el "Primer Contacto" a la compañía aseguradora.
+    2. Si se acepta, envía la notificación automáticamente a la compañía.
+    3. Envía un email al operario con los detalles del encargo.
+    4. Cambia el estado del expediente a "En Curso" tras solicitar que se defina el "Tipo de Daño".
+4. Movilidad y App para Operarios
+Extiende la oficina al lugar del siniestro mediante una Web App para los técnicos.
+• Recepción y Reporte: Los operarios reciben los encargos en su móvil y envían informes sobre los trabajos realizados.
+• Firma y Fotos: Permite enviar el "Parte de Trabajo" firmado por el cliente y las fotografías correspondientes desde el domicilio del riesgo.
+• Sincronización Instantánea: Los informes aparecen inmediatamente en la oficina en la "Bandeja de Informes de Operarios", detallando trabajos hechos y pendientes.
+5. Generación Documental y Multimedia
+El sistema automatiza la creación de entregables formales.
+• Generador de PDF Dinámico: Transforma la información digital y las fotos en un "Parte Físico" PDF. Crucialmente, aplica automáticamente el logotipo y estilo corporativo exigido por el cliente específico (marca blanca dinámica).
+• Gestión Fotográfica: Las fotos enviadas por los operarios se integran automáticamente en la pestaña "Documentos", accesibles para tramitadores y técnicos para valorar materiales y tiempos.
+6. Facturación, Presupuestos y Control de Cobro
+Flujo completo desde la valoración hasta el cobro.
+• Carga de Trabajos: En la pestaña "Presupuesto", se seleccionan trabajos mediante una estructura jerárquica: Especialidad > Epígrafe > Trabajo.
+• Validación Visual: Los trabajos e informes del operario se marcan en color verde al finalizarse, indicando visualmente que el expediente está listo.
+• Facturación Automática: Al cambiar el estado a "Finalizado", se habilita el botón "Facturar", que envía la factura al cliente siguiendo su protocolo específico.
+• Gestión de Cobros:
+    ◦ Bandeja Pendientes de Facturar: Almacena expedientes terminados que aún no se han facturado.
+    ◦ Bandeja Facturas Caducadas: Alerta sobre facturas enviadas que no han sido abonadas tras un tiempo prudencial definido por el usuario.
+7. Gestión de Tareas y Alertas (Workflow)
+Herramientas para evitar el olvido y gestionar excepciones.
+• Bandeja de Pendientes: Para expedientes paralizados por causas externas (ausencia de cliente, espera de peritación, secado). Permite filtrar por especialidad o cliente.
+• Informes Caducados: Una bandeja específica que alerta si un operario tenía una cita agendada pero no ha enviado el informe correspondiente, permitiendo reclamar antes que el cliente.
+• Sistema de Notas "Sticky": Permite crear tareas (ej. "Llamar a las 3 PM"). El sistema muestra un aviso visual (bocadillo) que persiste en pantalla, independientemente de en qué expediente se esté trabajando, hasta que se resuelve la tarea.
+8. Gestión de Proveedores y Materiales
+Control de la cadena de suministro integrado.
+• Pedidos: Se solicitan materiales desde la pestaña "Proveedores", indicando fecha límite. El proveedor recibe el pedido en su web app o correo.
+• Control de Plazos:
+    ◦ Pedidos a Recoger: Aviso cuando el proveedor confirma disponibilidad.
+    ◦ Pedidos Caducados: Alerta automática si se supera la fecha límite de entrega sin noticias del proveedor.
+9. Buscador Universal
+Motor de búsqueda avanzado para localización de siniestros.
+• Búsqueda Combinada: Permite localizar expedientes cruzando múltiples parámetros a la vez (ej. Localidad + Calle + Apellido) para encontrar casos con información parcial o difusa.
+10. Cuadro de Mando y Gerencia (BI)
+Herramientas analíticas para la dirección de la empresa.
+• Estadísticas en Tiempo Real: Informes sobre costes, rentabilidad, calidad, rendimiento de producción (por operario y administrativo) y carga de trabajo.
+• Exportación Contable: Capacidad de exportar toda la facturación a Excel o ContaPlus con un clic.
+Resumen de Valor
+El sistema GESTION SINIESTROS destaca por su filosofía de "dato único": se introduce una vez (o se ingiere automáticamente) y fluye por todos los módulos sin duplicidades. Su mayor fortaleza radica en las automatizaciones invisibles (avisos a compañías, integración de fotos, alertas de caducidad) que ocurren en segundo plano mientras el usuario realiza tareas básicas como agendar una cita.
+¿Cómo se integran las valoraciones económicas de los peritos en el flujo de facturación?
+¿Qué herramientas de movilidad específicas propone GESTION SINIESTROS para que los peritos trabajen en campo?
+¿Cómo maneja el sistema la aprobación de presupuestos tras la validación pericial?
+
+
+
+
+PUNTOS IMPORTANTES
+
+1. Ingesta Automatizada y Gestión de Expedientes
+2. Módulo de Comunicaciones (CRM Integrado)
+3. Planificación Inteligente (Agenda Interactiva)
+4. Movilidad y App para Operarios
+5. Generación Documental y Multimedia
+6. Facturación, Presupuestos y Control de Cobro
+8. Gestión de Proveedores y Materiales
+9. Buscador Universal
+10. Cuadro de Mando y Gerencia (BI)
+
+
+
+Ingesta Automatizada y Gestión de Expedientes
+
+Aquí tienes el Prompt Técnico Detallado para el primer módulo. Está diseñado para ser entregado directamente a un Senior Lead Developer o Software Architect.
+He traducido la descripción funcional del video a requerimientos técnicos específicos (Backend y Frontend), asegurando que se cumplan las promesas de "automatización", "edición directa" y "separación de campos" mencionadas en las fuentes.
+
+--------------------------------------------------------------------------------
+PROMPT TÉCNICO / ESPECIFICACIÓN FUNCIONAL
+MÓDULO 1: INGESTA AUTOMATIZADA Y GESTIÓN CORE DE EXPEDIENTES
+Rol: Lead Software Architect / Senior Full-Stack Developer. Objetivo: Construir el "corazón" del sistema GESTION SINIESTROS. Este módulo debe eliminar la entrada manual de datos y proporcionar una interfaz de gestión administrativa de alta velocidad. Tech Stack Sugerido: React/Vue.js (Frontend) + Node.js/Python (Backend) + SQL (PostgreSQL).
+
+--------------------------------------------------------------------------------
+1. BACKEND: ARQUITECTURA DE DATOS Y SERVICIOS DE INGESTA
+A. API Gateway & Webhook Receiver (El "Listener")
+• Requerimiento: Desarrollar un servicio de escucha (API REST/GraphQL) capaz de recibir peticiones (JSON/XML) de terceros (Compañías de Seguros y Portales de Asistencia).
+• Lógica de Parsing Inteligente:
+    ◦ El sistema no debe recibir un "bloque de texto". Debe parsear el payload entrante y mapear los datos a campos atómicos en la base de datos.
+    ◦ Validación: Asegurar que si el cliente envía datos, estos se integren "tal y como nos los envían" sin pérdidas.
+B. Esquema de Base de Datos (Entidad Expediente) Diseñar la tabla maestra Expedientes con estricta separación de columnas para facilitar la operativa diaria. Los campos obligatorios mapeados automáticamente deben ser:
+• Ref_Externa (Número de Expediente del Cliente).
+• Num_Poliza.
+• Asegurado_DNI.
+• Telefonos (Estructura Array o tabla relacionada 1:N, ya que pueden llegar múltiples números).
+• Direccion_Riesgo (Calle, Número, Piso, CP, Localidad, Geo-coords).
+• Descripcion_Daño (Campo de texto largo).
+• Metadata_Origen (Para identificar si viene de la Compañía A, B o C).
+C. Lógica de Enrutamiento de Comunicaciones (CRM Backend)
+• Clasificación Automática: Implementar una lógica que clasifique los expedientes y comunicaciones entrantes en "Sub-Bandejas" según el cliente corporativo (ej. Bucket_Mapfre, Bucket_Allianz).
+• Trazabilidad: Cualquier comunicación entrante (email/update) debe hacer match con el ID_Expediente y guardarse en una tabla Historial_Seguimiento con timestamp cronológico.
+
+--------------------------------------------------------------------------------
+2. FRONTEND: INTERFAZ DE USUARIO (UX) Y GESTIÓN
+A. Dashboard Principal: Sistema de Bandejas Reactivas
+• Vista "Asignaciones Nuevas": Grid de datos que muestra en tiempo real los encargos recién ingeridos por la API.
+• Vista "Bandeja de Pendientes" (Gestión de Excepciones):
+    ◦ Crear una vista específica para expedientes paralizados.
+    ◦ Filtros Obligatorios: Debe permitir filtrar por Especialidad/Gremio y por Cliente.
+    ◦ Estados de Paralización: Implementar selectores visuales para las causas citadas: Ausencia de cliente, Espera de materiales, Instrucciones periciales, Tiempo de secado (pintura).
+B. Componente de Ficha del Expediente (Smart Form)
+• Feature Crítica: Edición "In-Place" (Directa):
+    ◦ No usar un botón global de "Editar Formulario".
+    ◦ Requerimiento: Cada campo (Teléfono, Dirección, etc.) debe ser un componente editable individualmente. El usuario hace clic sobre el dato, edita y al hacer blur (clic fuera), se guarda automáticamente.
+    ◦ Justificación: Esto permite correcciones rápidas de erratas sin interrumpir el flujo de trabajo.
+C. Visualización de Datos
+• Los datos ingeridos deben renderizarse en inputs separados y limpios, no en un bloque de texto plano, para facilitar la lectura visual rápida del tramitador.
+
+--------------------------------------------------------------------------------
+3. CRITERIOS DE ACEPTACIÓN Y PERFORMANCE
+1. Cero Instalación: El sistema debe ser 100% Cloud (SaaS), accesible desde navegador sin ejecutables locales.
+2. Tecnología SPA: La navegación entre la "Bandeja de Nuevos" y la "Ficha del Expediente" debe ser instantánea (sin recarga de página), emulando la fluidez de aplicaciones como Facebook o Google.
+3. Integridad: El sistema debe garantizar que los datos de contacto (Teléfonos/Dirección) estén disponibles inmediatamente tras la recepción del JSON para poder contactar al asegurado sin demora.
+
+--------------------------------------------------------------------------------
+Nota para el Equipo: El valor diferencial de este módulo no es solo guardar datos, sino la automatización de la entrada (que el usuario no teclee nada) y la velocidad de corrección (edición directa). Priorizad la UX en la edición de campos.
+¿Cómo se integra la firma digital y fotos del operario?
+¿Qué protocolos usa el sistema para enviar facturas automáticamente?
+¿Cómo funciona el sistema de alertas persistentes para las tareas?
+
+Módulo de Comunicaciones (CRM Integrado)
+
+Aquí tienes el análisis detallado del Módulo de Comunicaciones (CRM Integrado) del sistema GESTION SINIESTROS, basado en la transcripción del video de presentación.
+Este módulo actúa como el sistema nervioso central de la aplicación, diseñado para eliminar la necesidad de utilizar correos electrónicos externos (Outlook, Gmail) o acceder manualmente a las "complicadas páginas web de sus clientes" para gestionar comunicaciones.
+1. Centralización y Recepción de Mensajes (Inbound)
+El sistema unifica toda la entrada de información en un solo punto, funcionando bajo la premisa de que el usuario no debe salir de la aplicación para revisar novedades.
+• Bandeja de Comunicaciones Segmentada: Al igual que los nuevos encargos se integran automáticamente, todas las comunicaciones entrantes (correos, notas, actualizaciones) llegan a una "Bandeja de Comunicaciones". Esta bandeja no es un buzón genérico; está separada por sub-bandejas correspondientes a cada cliente corporativo (Compañía A, Compañía B, etc.), organizándose a medida que entran los mensajes.
+• Asociación Automática (Trazabilidad): Cada comunicación recibida trae consigo el número de encargo inicial asignado. El sistema detecta este ID y vincula automáticamente el mensaje al expediente correspondiente, mostrándolo en el "seguimiento del expediente" de forma cronológica. Esto garantiza que el historial de lo sucedido esté siempre ordenado sin intervención manual.
+2. Envío Automatizado y "Inyección" de Datos (Outbound)
+Esta es una de las funcionalidades más avanzadas descritas en el video, actuando como un proxy transparente entre el usuario y los sistemas externos.
+• Interfaz de Envío Unificada: Para responder o enviar un comunicado, el usuario no necesita abrir su gestor de correo ni loguearse en la web del cliente. Todo se realiza desde el "cuadro de seguimiento" dentro de la propia ficha del expediente.
+• Inyección en Plataformas de Terceros: El usuario selecciona el tipo de comunicación, escribe el mensaje y hace clic en "Enviar". De forma automática, GESTION SINIESTROS "integra la comunicación en la página o buzón de correo del cliente". Esto implica que el sistema es capaz de autenticarse o interactuar con las APIs/Webs de las aseguradoras para "inyectar" el mensaje directamente en sus sistemas, ahorrando al tramitador el proceso manual de acceso y carga.
+• Registro de Auditoría: Al realizarse el envío, la acción queda reflejada inmediatamente en el seguimiento del expediente, garantizando un control sencillo y constante de qué se dijo y cuándo.
+3. Ecosistema de Comunicación Multidireccional
+El CRM no se limita a la relación Empresa-Cliente Corporativo (B2B), sino que abarca a todos los actores implicados en el ciclo de vida del siniestro.
+• Alcance Global: Permite mantener una comunicación fluida con reparadores asignados, asegurados, perjudicados, peritos y proveedores.
+• Automatización de Notificaciones: El sistema dispara comunicaciones automáticas basadas en eventos del flujo de trabajo sin que el usuario redacte nada.
+    ◦ Ejemplo: Al concertar una cita en el planificador ("Plan"), el sistema pregunta si se desea notificar a la compañía. Si se acepta, GESTION SINIESTROS envía automáticamente la comunicación a la compañía informando del "Primer Contacto",.
+    ◦ Ejemplo: Simultáneamente, envía un correo electrónico al profesional/operario asignado con los detalles del encargo.
+4. Eliminación de Duplicidades
+El objetivo final de este módulo es la eficiencia operativa. El sistema evita "hacer las cosas por triplicado".
+• En un flujo tradicional, un tramitador tendría que: 1) Llamar al asegurado, 2) Entrar en la web de la compañía para informar, 3) Escribir un email al operario.
+• En GESTION SINIESTROS, al fijar la fecha en el calendario, el sistema ejecuta las comunicaciones a la compañía y al operario automáticamente en segundo plano, registrando todo en el historial.
+En resumen, el Módulo de Comunicaciones de GESTION SINIESTROS transforma la gestión de mensajes de una tarea manual y fragmentada (múltiples webs y correos) en un flujo centralizado y automatizado, donde la comunicación es una consecuencia directa de la gestión del expediente.
+¿Cómo se integra el módulo de peritos en la arquitectura técnica?
+¿Qué protocolos usa GESTION SINIESTROS para inyectar facturas en sistemas externos?
+¿Cómo escala la infraestructura cloud para soportar múltiples compañías de seguros?
+
+Planificación Inteligente (Agenda Interactiva)
+
+Aquí tienes el análisis detallado del módulo de Planificación Inteligente (Agenda Interactiva), basado en la transcripción del video de presentación de GESTION SINIESTROS.
+Este módulo no funciona simplemente como un calendario, sino como un disparador de automatizaciones múltiples (backend triggers) que ejecuta tareas administrativas complejas a partir de una acción sencilla de usuario (clic en una hora).
+1. Interfaz Visual y Disponibilidad (UX)
+El objetivo es asignar el recurso más eficiente sin perder el contexto del siniestro.
+• Contexto Persistente: Al navegar a la pestaña "Plan" para concertar una visita, los datos críticos del encargo (dirección, teléfono, asegurado) permanecen visibles en pantalla, permitiendo al tramitador tener la información a mano mientras negocia la cita con el cliente.
+• Gestión de Gremios y Carga de Trabajo: El usuario selecciona el gremio necesario (fontanero, albañil, etc.). El sistema despliega la carga de trabajo de toda la semana y las horas disponibles de los operarios de ese gremio.
+• Optimización de Recursos: Esta visualización permite identificar rápidamente "cuál es el operario que más disposición tiene", facilitando una asignación eficiente.
+2. Cadena de Automatización "Nueva Cita" (El Core del Módulo)
+Aquí reside la mayor inteligencia del sistema. Al hacer clic en un hueco libre del calendario, se desencadena una secuencia de eventos (Workflow) que reemplaza el trabajo manual "por triplicado".
+Secuencia paso a paso:
+1. Trigger (Disparador): El usuario hace clic en una hora vacía y selecciona "Nueva Cita".
+2. Paso 1: Interacción con la Compañía (Notificación Externa):
+    ◦ El sistema lanza una ventana emergente preguntando: "¿Queremos enviar la notificación de primer contacto a la compañía?" (ej. Caser, Generali).
+    ◦ Acción Automática: Al aceptar, GESTION SINIESTROS se conecta automáticamente con la compañía y comunica que ya se ha realizado el contacto con el asegurado, cumpliendo con los SLAs (acuerdos de nivel de servicio) sin que el usuario entre en la web de la aseguradora.
+3. Paso 2: Asignación al Operario (Notificación Interna):
+    ◦ Tras rellenar los detalles de la cita, aparece otra ventana indicando que se ha enviado vía email el encargo al profesional asignado con todos los datos necesarios.
+4. Paso 3: Definición del Siniestro y Cambio de Estado:
+    ◦ Una última ventana solicita ingresar manualmente el "Tipo de Daño" basándose en la descripción recibida.
+    ◦ Cambio de Estado: El sistema avisa que el expediente pasa automáticamente del estado "Pendiente" o "No asignado" al estado "En Curso".
+3. Resultado y Trazabilidad
+Una vez completada la secuencia (que dura segundos), el sistema actualiza múltiples frentes simultáneamente:
+• Dashboard: En la parte superior derecha, el estado y el daño aparecen actualizados.
+• Historial: En la pestaña de seguimiento, queda registrado que GESTION SINIESTROS informó a la compañía del "Primer Contacto" y de la fecha/hora de la cita, "sin que usted haya tenido que pulsar ni una tecla para ello ni se haya visto obligado a cambiar de sistema".
+4. Flexibilidad Multi-Gremio
+El sistema está diseñado para siniestros complejos. Si se requieren más intervenciones (ej. después del fontanero se necesita un albañil o pintor), el usuario simplemente repite la acción en el planning eligiendo el nuevo gremio, manteniendo todo el flujo centralizado en el mismo expediente.
+Resumen para el Desarrollo: La "Planificación Inteligente" no es solo un datepicker. Es un orquestador de procesos que, al recibir una fecha (input), genera tres outputs paralelos: notificación B2B (Compañía), notificación B2C/Interna (Operario) y actualización de estado en la base de datos (Workflow).
+¿Cómo gestiona GESTION SINIESTROS las notificaciones automáticas para los peritos?
+¿Qué herramientas ofrece el cuadro de gerencia para el análisis?
+¿Cómo se integra la firma digital de los partes de trabajo?
+
+Movilidad y App para Operarios
+
+Aquí tienes el Prompt Técnico Detallado para el cuarto módulo, centrado en la Movilidad y App para Operarios.
+Este documento especifica los requisitos para extender la funcionalidad de la oficina al "campo de trabajo", permitiendo a los técnicos interactuar con el sistema en tiempo real sin necesidad de volver a la base, tal como se describe en la documentación de GESTION SINIESTROS.
+
+--------------------------------------------------------------------------------
+PROMPT TÉCNICO: MÓDULO 4 - MOVILIDAD Y APP DE OPERARIOS (FIELD SERVICE)
+Para: Mobile Web Developer / Frontend Specialist (PWA focus) Objetivo: Desarrollar una Web App Progresiva (PWA) responsiva que sirva como interfaz de trabajo para los técnicos desplazados. El objetivo es que la información fluya bidireccionalmente entre el domicilio del cliente y la oficina central de forma instantánea.
+
+--------------------------------------------------------------------------------
+1. ARQUITECTURA DE LA WEB APP (CLIENTE LIGERO)
+Requisito Core: No desarrollar una aplicación nativa (Play Store/App Store). La documentación especifica el uso de la "Web de GESTION SINIESTROS".
+• Accesibilidad: La interfaz debe ser accesible desde cualquier navegador móvil (Chrome/Safari) sin instalaciones complejas, alineándose con la filosofía "sin necesidad de instalaciones" del sistema.
+• Autenticación: Login simplificado para operarios que les muestre únicamente sus asignaciones y carga de trabajo.
+2. RECEPCIÓN DE ENCARGOS Y ACCESO A LA INFORMACIÓN
+A. Dashboard del Operario (Mi Agenda)
+• Visualización: El operario debe ver en su móvil la lista de encargos asignados.
+• Detalle del Expediente: Al entrar en un encargo, el técnico debe tener acceso a toda la información necesaria para realizar el trabajo, incluyendo imágenes previas si las hubiera, para tener "una idea clara del tiempo y el material que ha de necesitar".
+• Sincronización: Cuando la oficina asigna una cita en el "Plan", el operario debe recibir inmediatamente la notificación (vía email o push) y ver la actualización en su agenda móvil.
+3. REPORTING DE CAMPO (EL "PARTE DE TRABAJO" DIGITAL)
+Funcionalidad Crítica: Eliminar el papel. El operario debe poder cerrar el siniestro "desde el domicilio del cliente".
+A. Formulario de Cierre de Intervención
+• Inputs: Campos para describir los "trabajos realizados" y listar los "daños pendientes por atender" si los hubiera.
+• Captura de Firma (Canvas): Implementar un pad de firma digital en pantalla para que el asegurado firme el parte directamente en el dispositivo móvil del operario.
+• Módulo de Cámara/Fotos:
+    ◦ Permitir tomar fotos directamente o subirlas de la galería.
+    ◦ Lógica de Backend: Estas fotos deben integrarse automáticamente en la pestaña "Documentos" del expediente central.
+    ◦ Generación de Entregable: Los datos + firma + fotos deben compilarse para generar posteriormente el "parte físico en formato PDF".
+4. SINCRONIZACIÓN EN TIEMPO REAL (INSTANTANEIDAD)
+Workflow de Comunicación:
+• Trigger: Al pulsar "Enviar Informe" en el móvil.
+• Reacción en Oficina: El informe debe aparecer "de forma instantánea como si de un mensaje de texto se tratase" en la aplicación de escritorio.
+• UI Destino: Debe aparecer específicamente en la bandeja "Informe de Operarios" en la parte inferior de la pantalla del tramitador.
+• Validación de Cierre: Una vez que el tramitador revisa y marca el informe, este debe desaparecer de la bandeja de entrada para mantener la limpieza visual.
+5. GESTIÓN DE EXCEPCIONES Y CONTROL DE SLAs
+Lógica de Alerta (Watchdog):
+• El sistema debe monitorear el cumplimiento de los operarios.
+• Regla de Negocio: Si Fecha_Cita < NOW Y Informe_Recibido == FALSE:
+    ◦ Mover el expediente a la bandeja "Informes Caducados".
+    ◦ Permitir filtrar esta bandeja por nombres u oficios para reclamar rápidamente a quien "no está cumpliendo con su obligación diaria".
+
+--------------------------------------------------------------------------------
+Nota para el Desarrollador: La clave de este módulo es la integridad de los datos multimedia. Las fotos que toma el operario son la prueba del trabajo y deben viajar del móvil al servidor y luego al PDF del cliente sin intervención manual. La experiencia debe ser tan sencilla que evite que el operario tenga que "ir a buscar a carpetas de rutas sus días anteriores"; todo debe quedar registrado al momento.
+¿Cómo se integra la firma digital en los informes móviles?
+¿Cómo genera el sistema automáticamente el PDF con marca blanca?
+¿Qué protocolos usa el backend para inyectar facturas al cliente?
+
+Generación Documental y Multimedia
+
+Aquí tienes el análisis detallado del módulo 5. Generación Documental y Multimedia, basado en la transcripción del video.
+Este módulo es crítico porque actúa como el puente de traducción entre el trabajo físico realizado en el campo (fotos y notas técnicas) y la burocracia formal exigida por las compañías de seguros (informes corporativos estandarizados).
+1. Centralización y Persistencia Multimedia
+El sistema elimina la dispersión de archivos (fotos en WhatsApp, emails sueltos, carpetas locales).
+• Ingesta Automática: Las fotografías no se suben manualmente en la oficina. Provienen directamente del "parte firmado" que el operario envía desde el domicilio del cliente a través de su Web App.
+• Almacenamiento Estructurado: El sistema separa automáticamente las imágenes del flujo de texto y las conserva organizadas en la pestaña "Documentos" del expediente.
+• Disponibilidad Bidireccional: Estas imágenes quedan disponibles en la nube tanto para el tramitador en la oficina como para otros operarios en sus móviles. Esto permite que, antes de ir a una visita, un profesional pueda ver las fotos previas para tener "una idea clara del tiempo y el material que ha de necesitar", aplicando la lógica de que "una imagen vale más que mil palabras".
+2. Motor de Generación de PDF (Whitelabel Dinámico)
+Esta es la funcionalidad técnica más destacada del módulo. GESTION SINIESTROS no genera un informe genérico, sino que adapta el documento a la identidad corporativa del cliente.
+• Transformación de Datos: El sistema toma la información digital (datos del siniestro, texto del informe del operario y firma digital) y la transforma en un "parte físico en formato PDF".
+• Adaptabilidad de Marca (Branding): El motor de generación aplica automáticamente el logotipo y el estilo que exige cada cliente específico (Compañía A, Compañía B, etc.).
+    ◦ Implicación Técnica: Si el expediente pertenece a la aseguradora "X", el PDF generado tendrá la cabecera, colores y tipografía de "X". Si es de "Y", cambiará el diseño automáticamente. Esto asegura el cumplimiento de las "directrices de sus clientes" sin esfuerzo de diseño por parte del usuario.
+• Fusión de Contenido: El PDF integra las fotos enviadas por el profesional en el cuerpo del documento automáticamente, listas para ser presentadas.
+3. Validación Visual y Cierre
+El módulo multimedia está estrechamente ligado al flujo de trabajo de facturación.
+• Indicadores de Estado: Cuando el informe del operario (con sus fotos y datos) es revisado y validado, el sistema marca el ítem en color verde en la pestaña de presupuestos.
+• Limpieza de Flujo: Al marcar el informe como procesado, este desaparece automáticamente de la bandeja de entrada ("Informe de Operarios") para mantener el área de trabajo limpia.
+En resumen, este módulo automatiza la maquetación de informes. Convierte datos desestructurados (fotos de móvil y notas rápidas) en documentos formales, corporativos y estandarizados, listos para ser enviados a la compañía aseguradora.
+¿Cómo gestiona GESTION SINIESTROS las fotos tomadas por los peritos?
+¿Qué herramientas de control financiero para gerencia incluye el sistema?
+¿Cómo se integra GESTION SINIESTROS con los protocolos de las aseguradoras?
+
+Facturación, Presupuestos y Control de Cobro
+
+Aquí tienes el análisis detallado del módulo 6. Facturación, Presupuestos y Control de Cobro, basado estrictamente en la transcripción del video de presentación.
+Este módulo cierra el ciclo operativo del expediente, transformando los trabajos técnicos reportados en activos financieros y asegurando la liquidez de la empresa mediante un control proactivo de la deuda.
+1. Carga de Trabajos y Confección del Presupuesto
+El sistema utiliza una estructura jerárquica para cargar los costes, lo que facilita la creación automática de la factura sin necesidad de redacción manual.
+• Flujo de Selección: En la pestaña "Presupuesto", el usuario selecciona los ítems siguiendo una lógica de árbol:
+    1. Especialidad: (Ej. Fontanería).
+    2. Epígrafe: (Ej. Reparación con soldadura).
+    3. Trabajo: Se agrega el ítem específico al expediente.
+• Propósito: Esta acción de cargar trabajos sirve simultáneamente para documentar el siniestro y para "ir creando la factura" en segundo plano.
+2. Validación Visual y Cierre Operativo (Semáforo)
+El sistema emplea indicadores visuales (código de colores) para confirmar que un expediente está listo para ser facturado, evitando errores administrativos.
+• Validación "En Verde": Una vez cargados los trabajos, el usuario los marca como "finalizados". Al hacer esto, tanto los ítems de trabajo como el informe del operario adquieren un color verde.
+• Significado del Estado: Este color indica visualmente que el expediente ya ha sido tramitado correctamente. Al marcar el informe del operario como validado, este desaparece automáticamente de la "Bandeja de informes de operarios", manteniendo el área de trabajo limpia.
+• Transición de Estado: Para habilitar la facturación, es requisito indispensable cambiar el estado del expediente a "Finalizado".
+3. Facturación Automatizada y Envío Telemático
+El proceso de facturación se reduce a un solo clic, eliminando la necesidad de descargar archivos para luego subirlos a otras plataformas.
+• Alerta de Facturación: En la pestaña "Factura", aparece una línea indicadora avisando que "hay una factura por hacer" si el expediente está finalizado pero no facturado.
+• Envío por Protocolo Específico: Al hacer clic en el botón "Facturar" y luego en "Enviar Factura", el sistema no solo genera el documento, sino que lo envía al cliente "mediante su protocolo de comunicación". Esto implica que GESTION SINIESTROS sabe cómo quiere recibir la factura cada compañía (email, API, XML) y lo ejecuta automáticamente.
+4. Control de Cobro y Gestión de Tesorería (Aging)
+GESTION SINIESTROS incluye un sistema de vigilancia financiera mediante "Bandejas Inteligentes" que alertan sobre retrasos en la facturación o en el cobro.
+• Bandeja "Pendientes de Facturar": Almacena automáticamente todos los expedientes que se han marcado como "Finalizados" pero que, por olvido o error, aún no se han facturado. Esto asegura que ningún trabajo realizado se quede sin cobrar por un descuido administrativo.
+• Bandeja "Facturas Caducadas": Aquí aparecen los expedientes que ya han sido facturados y enviados, pero de los cuales no se ha recibido el pago tras pasar un "tiempo prudencial" estipulado por el usuario.
+    ◦ Utilidad: Permite filtrar y localizar rápidamente estas facturas para "reclamar a nuestros clientes" antes de que la deuda se vuelva incobrable.
+5. Interoperabilidad y Contabilidad
+El sistema no es una isla; permite la exportación de datos para la gestión contable formal y el análisis de negocio.
+• Exportación Contable: Permite exportar todas las facturas a sistemas de terceros como ContaPlus o a formato Excel con "un simple clic", ahorrando tiempo al personal contable.
+• Autofacturación: El sistema contempla la generación de autofacturas para subcontratados.
+• Analítica en Tiempo Real: Desde el cuadro de gerencia, se puede visualizar la rentabilidad, los costes y el rendimiento económico del expediente en tiempo real.
+En resumen, este módulo automatiza la creación de la factura basándose en los datos técnicos, gestiona su envío telemático según las reglas del cliente y actúa como un "perro guardián" financiero que alerta si una factura no se ha emitido o si un cliente se retrasa en el pago.
+¿Cómo gestiona GESTION SINIESTROS las notificaciones automáticas para los peritos?
+¿Qué tipos de informes de rentabilidad ofrece el cuadro de gerencia?
+¿Cómo funciona la exportación de facturas a ContaPlus o Excel?
+
+Gestión de Proveedores y Materiales
+
+Aquí tienes el análisis detallado del módulo 8. Gestión de Proveedores y Materiales, basado en la transcripción del video de presentación.
+Este módulo extiende la capacidad de control del sistema más allá de los empleados internos (tramitadores y operarios), integrando a la cadena de suministro externa para evitar cuellos de botella en las reparaciones.
+1. Control y Solicitud de Materiales (Procurement)
+El sistema permite gestionar a los proveedores externos con la misma profundidad y herramientas que se utilizan para los operarios internos.
+• Trazabilidad del Material: GESTION SINIESTROS permite tener un control total sobre qué materiales se suministran y, crucialmente, "para qué trabajos están destinados". Esto vincula el coste del material directamente al expediente.
+• Canal de Pedido Dual: Desde la pestaña "Proveedores", el tramitador realiza el encargo del material necesario. El sistema envía este pedido al proveedor simultáneamente por dos vías para asegurar su recepción:
+    1. A su Web App (si el proveedor usa el sistema).
+    2. A su Correo Electrónico.
+• Fecha Límite (SLA): Al realizar el pedido, el sistema permite marcar una "fecha límite de entrega". Este dato es vital para activar las automatizaciones de control de plazos posteriores.
+2. Confirmación y Continuidad del Flujo (Happy Path)
+El sistema está diseñado para reactivar el expediente tan pronto como el material está disponible, reduciendo los tiempos muertos.
+• Confirmación Digital: El proveedor interactúa con el sistema desde su propia interfaz web para indicar que "ya tiene el material" disponible.
+• Bandeja "Pedidos a Recoger": En el momento en que el proveedor confirma, el expediente aparece automáticamente en la sub-bandeja "Pedidos a Recoger" dentro de la bandeja de pedidos.
+• Reactivación Inmediata: Esta notificación permite al tramitador reanudar el curso del expediente al instante, procediendo a "darle cita al profesional correspondiente" para que recoja el material y ejecute la reparación sin esperas innecesarias.
+3. Gestión de Excepciones y Retrasos (Watchdog)
+Al igual que con los operarios, GESTION SINIESTROS actúa como un vigilante de los plazos para evitar reclamaciones por retrasos en los suministros.
+• Bandeja "Pedidos Caducados": Si se supera la fecha límite de entrega estipulada en el pedido y el proveedor no ha confirmado disponibilidad, el sistema mueve automáticamente el expediente a la bandeja "Pedidos Caducados".
+• Visibilidad de Errores: Esta funcionalidad garantiza que los retrasos estén siempre a la vista, permitiendo al tramitador anticiparse a las quejas. El objetivo es saber "quién no está cumpliendo" y poder informar o gestionar la incidencia antes de recibir una reclamación del cliente.
+En resumen, este módulo integra a los proveedores en el ecosistema digital de la empresa, permitiendo saber en tiempo real si un material ha llegado o si lleva retraso, y vinculando esta disponibilidad directamente con la agenda de los operarios.
+¿Cómo se gestionan las alertas por retrasos en los materiales?
+¿Qué tipos de informes financieros genera el cuadro de gerencia?
+¿Cómo funciona el sistema de tareas con avisos persistentes?
+
+Buscador Universal
+
+Aquí tienes el análisis detallado del módulo 9. Buscador Universal, basado en la transcripción del video de presentación.
+Este módulo aborda una problemática común en la gestión administrativa: la dificultad de localizar un expediente cuando el interlocutor (un tercero, un asegurado nervioso) no dispone del número de referencia exacto.
+1. Concepto y Funcionalidad: "Localización Infalible"
+El Buscador Universal se define como una herramienta capaz de localizar expedientes "de cualquier forma y con cualquier parámetro". Su objetivo es romper la rigidez de los buscadores tradicionales que solo aceptan el número de expediente exacto.
+• Campos Múltiples: El sistema dispone de una "multitud de campos" habilitados para la búsqueda.
+• Búsqueda Directa: Permite las búsquedas estándar rápidas, como por ejemplo por el "número de expediente" o por el "número de teléfono",.
+2. Búsqueda Combinada y Acotación (Logic AND)
+La característica más potente descrita es la capacidad de "combinar parámetros entre sí" para resolver búsquedas complicadas o con información parcial. Funciona como un embudo de filtrado progresivo.
+El Caso de Uso "Señor García" (Ejemplo del Video): El video ilustra la potencia del buscador con un escenario realista:
+1. Input 1 (Dato Genérico): Un tercero llama preguntando por el siniestro de un tal "Señor García". Al introducir solo "García", el sistema devuelve "una barbaridad de expedientes" (demasiados resultados).
+2. Input 2 (Geolocalización): El usuario añade el dato "localidad de Valencia". El sistema cruza ambos datos y la búsqueda se reduce drásticamente a "cinco expedientes".
+3. Input 3 (Detalle Específico): Se añade el dato de la calle ("Calle Hermes"). El sistema localiza inequívocamente el "encargo que buscamos".
+3. Valor Operativo
+Esta herramienta permite atender llamadas y gestionar incidencias incluso cuando la información de entrada es vaga, pobre o incompleta, garantizando que el expediente se localice de una "forma infalible y muy sencilla".
+
+--------------------------------------------------------------------------------
+PROMPT TÉCNICO: MÓDULO 9 - BUSCADOR UNIVERSAL
+Aquí tienes las indicaciones para tu equipo de desarrollo (Web Developer Senior / Backend) para replicar esta funcionalidad específica:
+Para: Senior Backend Developer / Database Architect Objetivo: Implementar un motor de búsqueda "Omni-Search" de baja latencia.
+1. REQUISITOS DE BACKEND (QUERY BUILDER)
+• Motor de Búsqueda (Full-Text Search):
+    ◦ Implementar índices de texto completo (usando tecnologías como ElasticSearch o índices GIN/GiST si se usa PostgreSQL) sobre los campos clave: Ref_Expediente, DNI, Nombre_Asegurado, Teléfonos, Dirección (Calle, Localidad, CP).
+• Lógica de Filtrado Combinatorio (AND Operator):
+    ◦ La API de búsqueda no debe recibir un solo string. Debe aceptar un objeto de criterios dinámicos.
+    ◦ Query Logic: SELECT * FROM Expedientes WHERE (Campo_A LIKE %Input_A%) AND (Campo_B LIKE %Input_B%) AND (Campo_C LIKE %Input_C%).
+    ◦ Cada parámetro adicional que el usuario escriba debe actuar como un filtro restrictivo (AND), reduciendo el result set en tiempo real.
+2. REQUISITOS DE FRONTEND (UX REACTIVA)
+• Barra de Búsqueda Global:
+    ◦ Componente visible en todas las pantallas (Header persistente).
+• Inputs Dinámicos:
+    ◦ No usar una sola caja de texto. Diseñar una interfaz que permita agregar "tags" o criterios sobre la marcha (ej. Un input principal que detecte patrones o varios inputs pequeños para "Apellido", "Localidad", "Calle").
+• Resultados en Tiempo Real (Debounce):
+    ◦ A medida que el usuario escribe (ej. añade "Valencia"), la lista de resultados debajo debe actualizarse sin necesidad de pulsar "Enter" o "Buscar".
+    ◦ Feedback Visual: Mostrar el contador de resultados (ej. "5 expedientes encontrados") para que el usuario sepa si necesita añadir más filtros (como el nombre de la calle) para acotar.
+Nota para el Desarrollador: El sistema debe ser capaz de buscar dentro de arrays (como la lista de teléfonos) y cruzarlo con datos de texto (Apellidos). La velocidad es clave: el usuario está al teléfono con un cliente esperando, por lo que la query no puede tardar más de 200ms.
+¿Cómo gestiona GESTION SINIESTROS las alertas de tareas mediante el sistema de bocadillos?
+¿De qué manera el buscador universal combina parámetros para localizar siniestros?
+¿Cómo se integra la analítica de rentabilidad en el cuadro de gerencia?
+
+Cuadro de Mando y Gerencia (BI)
+
+Aquí tienes el análisis detallado del módulo 10. Cuadro de Mando y Gerencia (BI), basado en la transcripción del video de presentación.
+Este módulo final representa la "Torre de Control" del sistema GESTION SINIESTROS. Una vez que la operativa diaria (ingesta, citas, reparaciones, facturación) está automatizada, este módulo se encarga de explotar los datos para la toma de decisiones estratégicas, ofreciendo una visión macroscópica del estado funcional, económico y administrativo de la empresa.
+1. Analítica en Tiempo Real (Business Intelligence)
+El sistema abandona los informes estáticos mensuales y ofrece datos vivos. El gerente no necesita esperar a fin de mes para saber cómo va la empresa.
+• Visión 360º: El cuadro ofrece informes sobre el "estado funcional, económico y administrativo" de la compañía.
+• KPIs Financieros: Permite visualizar en tiempo real los costes operativos frente a la facturación, calculando la rentabilidad exacta de cada expediente.
+• KPIs de Producción:
+    ◦ Carga de Trabajo: Gráficas que muestran el volumen de trabajo diario, mensual y anual.
+    ◦ Comparativas: Herramientas para realizar "estadísticas comparativas anuales" (ej. ¿Estamos facturando más que el año pasado en el mismo mes?).
+2. Medición del Rendimiento Humano (RRHH)
+GESTION SINIESTROS introduce métricas de productividad tanto para el personal de campo como para el de oficina, permitiendo identificar cuellos de botella o empleados destacados.
+• Rentabilidad por Operario: El sistema no solo dice cuánto trabaja un operario, sino su rentabilidad económica. Esto ayuda a distinguir quién es eficiente resolviendo siniestros frente a quién genera más gastos.
+• Rendimiento Administrativo: Mide el "rendimiento del personal administrativo". Esto permite evaluar cuántos expedientes tramita cada empleado de oficina, su velocidad de resolución y su carga actual.
+3. Interoperabilidad Contable y Exportación
+El sistema reconoce que no es un software de contabilidad fiscal, por lo que facilita al máximo la transición de datos hacia herramientas especializadas.
+• Conectores "One-Click": La funcionalidad estrella es la capacidad de exportar todas las facturas a ContaPlus o a Excel con "un simple clic".
+• Ahorro Administrativo: Esta automatización busca "ahorrar un tiempo sustancial al personal contable", eliminando la necesidad de picar datos de facturas manualmente en el programa de contabilidad.
+4. Gestión de Subcontratas (Autofacturación)
+Para empresas que trabajan con autónomos externos en lugar de plantilla propia.
+• Autofacturación: El sistema incluye la funcionalidad de "autofacturación para subcontratados". Al igual que genera facturas para los clientes (aseguradoras), el sistema puede generar automáticamente la factura que el proveedor/autónomo debería emitir a la empresa de asistencia por sus servicios, basándose en los trabajos validados en el sistema.
+
+--------------------------------------------------------------------------------
+PROMPT TÉCNICO: MÓDULO 10 - CUADRO DE MANDO Y GERENCIA (BI)
+Aquí tienes las indicaciones para tu equipo de desarrollo (Data Engineer / Frontend Specialist) para construir este módulo analítico.
+Para: Lead Data Engineer / Frontend Developer (Data Visualization focus) Objetivo: Crear un Dashboard de BI reactivo que transforme los datos operativos en métricas de decisión. La prioridad es la visualización gráfica y la capacidad de exportación masiva sin bloquear el sistema.
+
+--------------------------------------------------------------------------------
+1. BACKEND: AGREGACIÓN DE DATOS Y EXPORTADORES
+A. Motor de Cálculo de Rentabilidad (On-Demand Calculation)
+• Lógica de Negocio:
+    ◦ Rentabilidad_Expediente = (Suma_Facturado) - (Coste_Horas_Operario + Coste_Materiales).
+• Requerimiento de Rendimiento: Estas consultas pueden ser pesadas. Implementar vistas materializadas o cachés en el backend para que la carga del Dashboard sea rápida, evitando recorrer millones de registros en tiempo real cada vez que se carga la página.
+B. Servicio de Exportación (The Bridge)
+• Módulo de Interoperabilidad:
+    ◦ Desarrollar un generador de archivos planos (.txt o .csv) con el formato específico de importación de ContaPlus (y otros estándares contables comunes).
+    ◦ Desarrollar un exportador a Excel (.xlsx) que no sea un CSV plano, sino que incluya cabeceras formateadas y tipos de datos correctos (moneda, fecha) para facilitar el trabajo del contable.
+• Lógica de Autofacturación:
+    ◦ Crear un proceso batch que agrupe todos los trabajos finalizados de un Proveedor_Subcontratado en un periodo (mes) y genere un documento PDF de "Autofactura" listo para enviar y contabilizar.
+2. FRONTEND: VISUALIZACIÓN DE DATOS (DASHBOARD UI)
+A. Librería de Gráficos Interactivos
+• Stack Sugerido: Usar librerías como Chart.js, Recharts o D3.js.
+• Componentes Requeridos:
+    ◦ Gráfico de Barras/Líneas: Para "Comparativas Anuales" (Año actual vs Año anterior) de facturación y volumen de expedientes.
+    ◦ Heatmaps o Calendarios: Para visualizar la "Carga de Trabajo Diaria/Mensual".
+    ◦ Tablas de Ranking: Listados ordenables por columnas para:
+        ▪ Top Rentabilidad Operarios (Ingresos generados - Costes).
+        ▪ Top Rendimiento Administrativo (Expedientes cerrados / Tiempo medio).
+B. UX de Gerencia
+• Filtros Globales: El dashboard debe permitir filtrar toda la data por Fechas, Cliente Corporativo y Zona Geográfica.
+• Botones de Acción Rápida: Colocar los botones de "Exportar a ContaPlus" y "Exportar a Excel" en una zona visible y accesible, garantizando que la acción se ejecute con un solo clic (descarga directa) como especifica el requisito funcional.
+
+--------------------------------------------------------------------------------
+Nota para el Desarrollador: Este módulo debe vender la "salud" de la empresa. Los datos deben ser precisos (coincidir con facturación) y la exportación a ContaPlus debe ser perfecta a nivel de formato, ya que un error ahí genera rechazo en el departamento contable.
+¿Cómo funciona el sistema de autofacturación para profesionales subcontratados?
+¿Qué tipos de informes específicos ofrece el cuadro de gerencia?
+¿Cómo gestiona GESTION SINIESTROS las notificaciones automáticas con los peritos externos?

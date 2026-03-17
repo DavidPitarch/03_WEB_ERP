@@ -1,0 +1,21 @@
+name = "erp-siniestros-api"
+main = "src/index.ts"
+compatibility_date = "2024-06-01"
+
+[vars]
+ENVIRONMENT = "development"
+
+# Queues (descomentar cuando se configuren)
+# [[queues.producers]]
+# queue = "domain-events"
+# binding = "DOMAIN_EVENTS_QUEUE"
+#
+# [[queues.consumers]]
+# queue = "domain-events"
+# max_batch_size = 10
+# max_retries = 3
+# dead_letter_queue = "domain-events-dlq"
+
+# Cron Triggers (watchdogs)
+[triggers]
+crons = ["0 7 * * *", "0 13 * * *"]

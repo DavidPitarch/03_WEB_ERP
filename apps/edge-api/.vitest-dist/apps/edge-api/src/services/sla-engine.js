@@ -56,26 +56,39 @@ export async function calculateSlaStatus(supabase, expedienteId) {
     // 1. Fetch expediente
     const { data: exp, error: expError } = await supabase
         .from('expedientes')
-        .select('fecha_encargo, fecha_limite_sla, estado, fecha_cierre')
+        .select('fecha_encargo, fecha_limite_sla, estado')
         .eq('id', expedienteId)
         .single();
     if (expError || !exp) {
         throw new Error(`Expediente ${expedienteId} no encontrado`);
     }
     const fechaEncargo = new Date(exp.fecha_encargo);
-    const fechaFin = exp.fecha_cierre ? new Date(exp.fecha_cierre) : now;
     const fechaLimiteSla = exp.fecha_limite_sla ? new Date(exp.fecha_limite_sla) : null;
+    let fechaFin = now;
+    if (['FINALIZADO', 'FACTURADO', 'COBRADO', 'CERRADO', 'CANCELADO'].includes(exp.estado)) {
+        const { data: cierre } = await supabase
+            .from('historial_estados')
+            .select('created_at')
+            .eq('expediente_id', expedienteId)
+            .in('estado_nuevo', ['FINALIZADO', 'FACTURADO', 'COBRADO', 'CERRADO', 'CANCELADO'])
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        if (cierre?.created_at) {
+            fechaFin = new Date(cierre.created_at);
+        }
+    }
     // 2. Fetch pausas
     const { data: pausasRaw } = await supabase
         .from('sla_pausas')
-        .select('estado, inicio, fin')
+        .select('estado_pausa, inicio, fin')
         .eq('expediente_id', expedienteId)
         .order('inicio', { ascending: true });
     const pausas = (pausasRaw ?? []).map((p) => {
         const inicio = new Date(p.inicio);
         const fin = p.fin ? new Date(p.fin) : now;
         return {
-            estado: p.estado,
+            estado: p.estado_pausa,
             inicio: p.inicio,
             fin: p.fin,
             duracion_ms: fin.getTime() - inicio.getTime(),
@@ -125,7 +138,7 @@ export async function registerSlaPause(supabase, expedienteId, estadoPausa, moti
         .from('sla_pausas')
         .insert({
         expediente_id: expedienteId,
-        estado: estadoPausa,
+        estado_pausa: estadoPausa,
         inicio: new Date().toISOString(),
         fin: null,
         motivo: motivo ?? null,
@@ -160,7 +173,7 @@ export async function getCalendarioLaboral(supabase, desde, hasta) {
         .select('fecha')
         .gte('fecha', desde)
         .lte('fecha', hasta)
-        .eq('es_festivo', true);
+        .neq('tipo', 'laborable');
     if (error)
         throw new Error(`Error consultando calendario laboral: ${error.message}`);
     return (data ?? []).map((r) => r.fecha);

@@ -1,82 +1,41 @@
 import { Hono } from 'hono';
-import { insertAudit, insertDomainEvent } from '../services/audit';
+import { getRequestIp } from '../http/request-metadata';
+import { createCitaCommand, normalizeCommandError, } from '../services/core-commands';
 export const citasRoutes = new Hono();
-// POST /citas — Crear cita
+// POST /citas - Crear cita
 citasRoutes.post('/', async (c) => {
-    const supabase = c.get('supabase');
+    const supabase = c.get('adminSupabase');
     const user = c.get('user');
     const body = await c.req.json();
-    // Validar expediente existe
-    const { data: exp } = await supabase
-        .from('expedientes')
-        .select('id, estado')
-        .eq('id', body.expediente_id)
-        .single();
-    if (!exp) {
-        return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Expediente no encontrado' } }, 404);
+    const required = ['expediente_id', 'operario_id', 'fecha', 'franja_inicio', 'franja_fin'];
+    const missing = required.filter((field) => !body[field]);
+    if (missing.length > 0) {
+        return c.json({ data: null, error: { code: 'VALIDATION', message: `Campos requeridos: ${missing.join(', ')}` } }, 422);
     }
-    // Solo se puede agendar cita si el expediente está en planificación o en curso
-    const estadosPermitidos = ['EN_PLANIFICACION', 'EN_CURSO', 'PENDIENTE_CLIENTE'];
-    if (!estadosPermitidos.includes(exp.estado)) {
+    try {
+        const data = await createCitaCommand(supabase, {
+            expediente_id: body.expediente_id,
+            operario_id: body.operario_id,
+            fecha: body.fecha,
+            franja_inicio: body.franja_inicio,
+            franja_fin: body.franja_fin,
+            notas: body.notas ?? null,
+        }, user.id, getRequestIp(c));
+        return c.json({ data, error: null }, 201);
+    }
+    catch (error) {
+        const commandError = normalizeCommandError(error);
         return c.json({
             data: null,
-            error: { code: 'INVALID_STATE', message: `No se puede crear cita en estado ${exp.estado}` },
-        }, 422);
+            error: {
+                code: commandError.code,
+                message: commandError.message,
+                details: commandError.details,
+            },
+        }, commandError.status);
     }
-    // Validar operario existe
-    const { data: operario } = await supabase
-        .from('operarios')
-        .select('id')
-        .eq('id', body.operario_id)
-        .eq('activo', true)
-        .single();
-    if (!operario) {
-        return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Operario no encontrado o inactivo' } }, 404);
-    }
-    // Validar franja horaria
-    if (body.franja_inicio >= body.franja_fin) {
-        return c.json({
-            data: null,
-            error: { code: 'VALIDATION', message: 'La franja de inicio debe ser anterior a la de fin' },
-        }, 422);
-    }
-    const cita = {
-        expediente_id: body.expediente_id,
-        operario_id: body.operario_id,
-        fecha: body.fecha,
-        franja_inicio: body.franja_inicio,
-        franja_fin: body.franja_fin,
-        notas: body.notas ?? null,
-    };
-    const { data, error } = await supabase.from('citas').insert(cita).select().single();
-    if (error) {
-        return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
-    }
-    // Actualizar operario del expediente si no tiene
-    await supabase
-        .from('expedientes')
-        .update({ operario_id: body.operario_id })
-        .eq('id', body.expediente_id)
-        .is('operario_id', null);
-    await Promise.all([
-        insertAudit(supabase, {
-            tabla: 'citas',
-            registro_id: data.id,
-            accion: 'INSERT',
-            actor_id: user.id,
-            cambios: cita,
-        }),
-        insertDomainEvent(supabase, {
-            aggregate_id: body.expediente_id,
-            aggregate_type: 'expediente',
-            event_type: 'CitaAgendada',
-            payload: { cita_id: data.id, operario_id: body.operario_id, fecha: body.fecha },
-            actor_id: user.id,
-        }),
-    ]);
-    return c.json({ data, error: null }, 201);
 });
-// GET /citas?expediente_id=xxx — Citas de un expediente
+// GET /citas?expediente_id=xxx - Citas de un expediente
 citasRoutes.get('/', async (c) => {
     const supabase = c.get('supabase');
     const expedienteId = c.req.query('expediente_id');

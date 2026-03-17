@@ -1,9 +1,27 @@
 import { Hono } from 'hono';
 import { insertAudit, insertDomainEvent } from '../services/audit';
 import { sendEmail } from '../services/email-sender';
+import { insertExpedienteTimelineEntry } from '../services/expediente-timeline';
+import { assertVpArtefactAccess, VP_SIGNED_URL_TTL_SECONDS, VpArtefactAccessError, } from '../services/vp-access';
 export const videoperitacionesRoutes = new Hono();
 function err(code, message) {
     return { data: null, error: { code, message } };
+}
+async function insertVpExpedienteTimeline(supabase, user, params) {
+    return insertExpedienteTimelineEntry(supabase, {
+        expedienteId: params.expedienteId,
+        actorId: user.id,
+        actor: user,
+        actorName: params.actorName,
+        type: params.type,
+        actorScope: params.actorScope,
+        subject: params.subject,
+        content: params.content,
+        metadata: {
+            module: 'videoperitacion',
+            ...(params.metadata ?? {}),
+        },
+    });
 }
 // ═══════════════════════════════════════════════════════════════════════════
 // Static routes FIRST (before /:id)
@@ -70,7 +88,7 @@ videoperitacionesRoutes.get('/', async (c) => {
     const fecha_desde = c.req.query('fecha_desde');
     const fecha_hasta = c.req.query('fecha_hasta');
     let query = supabase
-        .from('videoperitaciones')
+        .from('vp_videoperitaciones')
         .select('*, expedientes(numero_expediente), peritos(nombre, apellidos)', { count: 'exact' });
     if (estado)
         query = query.eq('estado', estado);
@@ -105,7 +123,7 @@ videoperitacionesRoutes.get('/:id', async (c) => {
     const supabase = c.get('supabase');
     const id = c.req.param('id');
     const { data: vp, error } = await supabase
-        .from('videoperitaciones')
+        .from('vp_videoperitaciones')
         .select('*, expedientes(*), peritos(*)')
         .eq('id', id)
         .single();
@@ -143,13 +161,13 @@ videoperitacionesRoutes.post('/', async (c) => {
     // Generar numero_caso: VP-{year}-{seq 5 digits}
     const year = new Date().getFullYear();
     const { count } = await supabase
-        .from('videoperitaciones')
+        .from('vp_videoperitaciones')
         .select('id', { count: 'exact', head: true })
         .gte('created_at', `${year}-01-01`);
     const seq = String((count ?? 0) + 1).padStart(5, '0');
     const numero_caso = `VP-${year}-${seq}`;
     const { data: vp, error: vpErr } = await supabase
-        .from('videoperitaciones')
+        .from('vp_videoperitaciones')
         .insert({
         expediente_id: body.expediente_id,
         perito_id: body.perito_id ?? null,
@@ -165,18 +183,23 @@ videoperitacionesRoutes.post('/', async (c) => {
         .single();
     if (vpErr)
         return c.json(err('DB_ERROR', vpErr.message), 500);
-    // Insert timeline comunicacion to expediente
-    await supabase.from('comunicaciones').insert({
-        expediente_id: body.expediente_id,
-        tipo: 'nota_interna',
-        asunto: `Videoperitación ${numero_caso} creada`,
-        contenido: `Se ha creado el caso de videoperitación ${numero_caso}.`,
-        emisor_tipo: 'sistema',
-        actor_id: user.id,
+    await insertVpExpedienteTimeline(supabase, user, {
+        expedienteId: body.expediente_id,
+        type: 'sistema',
+        actorScope: 'sistema',
+        actorName: 'Sistema ERP',
+        subject: `Videoperitacion ${numero_caso} creada`,
+        content: `Se ha creado el caso de videoperitacion ${numero_caso}.`,
+        metadata: {
+            videoperitacion_id: vp.id,
+            numero_caso,
+            referencia_tipo: 'videoperitacion',
+            referencia_id: vp.id,
+        },
     });
     await Promise.all([
         insertAudit(supabase, {
-            tabla: 'videoperitaciones',
+            tabla: 'vp_videoperitaciones',
             registro_id: vp.id,
             accion: 'INSERT',
             actor_id: user.id,
@@ -227,7 +250,7 @@ videoperitacionesRoutes.post('/:id/registrar-encargo', async (c) => {
     if (!body.tipo || !body.contenido)
         return c.json(err('VALIDATION', 'tipo y contenido son requeridos'), 422);
     const { data: vp } = await supabase
-        .from('videoperitaciones')
+        .from('vp_videoperitaciones')
         .select('id, estado')
         .eq('id', id)
         .single();
@@ -249,7 +272,7 @@ videoperitacionesRoutes.post('/:id/registrar-encargo', async (c) => {
     // Update estado to 'pendiente_contacto' if still 'encargo_recibido'
     if (vp.estado === 'encargo_recibido') {
         await supabase
-            .from('videoperitaciones')
+            .from('vp_videoperitaciones')
             .update({ estado: 'pendiente_contacto' })
             .eq('id', id);
     }
@@ -280,7 +303,7 @@ videoperitacionesRoutes.post('/:id/registrar-comunicacion', async (c) => {
     if (!body.tipo || !body.contenido)
         return c.json(err('VALIDATION', 'tipo y contenido son requeridos'), 422);
     const { data: vp } = await supabase
-        .from('videoperitaciones')
+        .from('vp_videoperitaciones')
         .select('id, expediente_id')
         .eq('id', id)
         .single();
@@ -301,14 +324,20 @@ videoperitacionesRoutes.post('/:id/registrar-comunicacion', async (c) => {
         .single();
     if (comErr)
         return c.json(err('DB_ERROR', comErr.message), 500);
-    // Also insert into expediente comunicaciones table for timeline
-    await supabase.from('comunicaciones').insert({
-        expediente_id: vp.expediente_id,
-        tipo: body.tipo,
-        emisor_tipo: body.emisor_tipo ?? null,
-        asunto: body.asunto ?? null,
-        contenido: body.contenido,
-        actor_id: user.id,
+    await insertVpExpedienteTimeline(supabase, user, {
+        expedienteId: vp.expediente_id,
+        type: body.tipo,
+        actorScope: body.emisor_tipo ?? 'oficina',
+        subject: body.asunto ?? undefined,
+        content: body.contenido,
+        metadata: {
+            emisor_tipo: body.emisor_tipo ?? null,
+            resultado: body.resultado ?? null,
+            adjuntos_refs: body.adjuntos_refs ?? [],
+            videoperitacion_id: id,
+            referencia_tipo: 'videoperitacion',
+            referencia_id: id,
+        },
     });
     await insertAudit(supabase, {
         tabla: 'vp_comunicaciones',
@@ -328,7 +357,7 @@ videoperitacionesRoutes.post('/:id/comunicaciones', async (c) => {
     if (!body.tipo || !body.contenido)
         return c.json(err('VALIDATION', 'tipo y contenido son requeridos'), 422);
     const { data: vp } = await supabase
-        .from('videoperitaciones')
+        .from('vp_videoperitaciones')
         .select('id, expediente_id')
         .eq('id', id)
         .single();
@@ -349,13 +378,20 @@ videoperitacionesRoutes.post('/:id/comunicaciones', async (c) => {
         .single();
     if (comErr)
         return c.json(err('DB_ERROR', comErr.message), 500);
-    await supabase.from('comunicaciones').insert({
-        expediente_id: vp.expediente_id,
-        tipo: body.tipo,
-        emisor_tipo: body.emisor_tipo ?? null,
-        asunto: body.asunto ?? null,
-        contenido: body.contenido,
-        actor_id: user.id,
+    await insertVpExpedienteTimeline(supabase, user, {
+        expedienteId: vp.expediente_id,
+        type: body.tipo,
+        actorScope: body.emisor_tipo ?? 'oficina',
+        subject: body.asunto ?? undefined,
+        content: body.contenido,
+        metadata: {
+            emisor_tipo: body.emisor_tipo ?? null,
+            resultado: body.resultado ?? null,
+            adjuntos_refs: body.adjuntos_refs ?? [],
+            videoperitacion_id: id,
+            referencia_tipo: 'videoperitacion',
+            referencia_id: id,
+        },
     });
     await insertAudit(supabase, {
         tabla: 'vp_comunicaciones',
@@ -375,7 +411,7 @@ videoperitacionesRoutes.post('/:id/registrar-intento-contacto', async (c) => {
     if (!body.canal || !body.resultado)
         return c.json(err('VALIDATION', 'canal y resultado son requeridos'), 422);
     const { data: vp } = await supabase
-        .from('videoperitaciones')
+        .from('vp_videoperitaciones')
         .select('id, estado')
         .eq('id', id)
         .single();
@@ -403,7 +439,7 @@ videoperitacionesRoutes.post('/:id/registrar-intento-contacto', async (c) => {
     // Update VP estado to 'contactado' if resultado='contactado'
     if (body.resultado === 'contactado') {
         await supabase
-            .from('videoperitaciones')
+            .from('vp_videoperitaciones')
             .update({ estado: 'contactado' })
             .eq('id', id);
     }
@@ -435,7 +471,7 @@ videoperitacionesRoutes.post('/:id/agendar', async (c) => {
         return c.json(err('VALIDATION', 'fecha, hora_inicio y hora_fin son requeridos'), 422);
     }
     const { data: vp } = await supabase
-        .from('videoperitaciones')
+        .from('vp_videoperitaciones')
         .select('id, estado')
         .eq('id', id)
         .single();
@@ -455,7 +491,7 @@ videoperitacionesRoutes.post('/:id/agendar', async (c) => {
     if (agendaErr)
         return c.json(err('DB_ERROR', agendaErr.message), 500);
     await supabase
-        .from('videoperitaciones')
+        .from('vp_videoperitaciones')
         .update({ estado: 'agendado' })
         .eq('id', id);
     await Promise.all([
@@ -486,7 +522,7 @@ videoperitacionesRoutes.post('/:id/reprogramar', async (c) => {
         return c.json(err('VALIDATION', 'agenda_id, fecha, hora_inicio y hora_fin son requeridos'), 422);
     }
     const { data: vp } = await supabase
-        .from('videoperitaciones')
+        .from('vp_videoperitaciones')
         .select('id, estado')
         .eq('id', id)
         .single();
@@ -515,7 +551,7 @@ videoperitacionesRoutes.post('/:id/reprogramar', async (c) => {
     if (agendaErr)
         return c.json(err('DB_ERROR', agendaErr.message), 500);
     await supabase
-        .from('videoperitaciones')
+        .from('vp_videoperitaciones')
         .update({ estado: 'agendado' })
         .eq('id', id);
     await Promise.all([
@@ -545,7 +581,7 @@ videoperitacionesRoutes.post('/:id/cancelar', async (c) => {
     if (!motivo)
         return c.json(err('VALIDATION', 'motivo es requerido'), 422);
     const { data: vp } = await supabase
-        .from('videoperitaciones')
+        .from('vp_videoperitaciones')
         .select('id, estado, numero_caso')
         .eq('id', id)
         .single();
@@ -553,7 +589,7 @@ videoperitacionesRoutes.post('/:id/cancelar', async (c) => {
         return c.json(err('NOT_FOUND', 'Videoperitación no encontrada'), 404);
     const now = new Date().toISOString();
     const { error } = await supabase
-        .from('videoperitaciones')
+        .from('vp_videoperitaciones')
         .update({ estado: 'cancelado', cancelado_at: now, cancelado_motivo: motivo })
         .eq('id', id);
     if (error)
@@ -566,7 +602,7 @@ videoperitacionesRoutes.post('/:id/cancelar', async (c) => {
         .is('estado', null);
     await Promise.all([
         insertAudit(supabase, {
-            tabla: 'videoperitaciones',
+            tabla: 'vp_videoperitaciones',
             registro_id: id,
             accion: 'UPDATE',
             actor_id: user.id,
@@ -591,7 +627,7 @@ videoperitacionesRoutes.post('/:id/enviar-link', async (c) => {
     if (!body.link_externo)
         return c.json(err('VALIDATION', 'link_externo es requerido'), 422);
     const { data: vp } = await supabase
-        .from('videoperitaciones')
+        .from('vp_videoperitaciones')
         .select('id, estado, numero_caso, expediente_id')
         .eq('id', id)
         .single();
@@ -627,7 +663,7 @@ videoperitacionesRoutes.post('/:id/enviar-link', async (c) => {
         return c.json(err('DB_ERROR', agendaErr.message), 500);
     // Update VP estado
     await supabase
-        .from('videoperitaciones')
+        .from('vp_videoperitaciones')
         .update({ estado: 'link_enviado' })
         .eq('id', id);
     // Get asegurado email via expediente
@@ -768,40 +804,40 @@ videoperitacionesRoutes.get('/artefactos/:artefactoId/signed-url', async (c) => 
     const supabase = c.get('supabase');
     const user = c.get('user');
     const artefactoId = c.req.param('artefactoId');
-    const { data: art } = await supabase
-        .from('vp_artefactos')
-        .select('id, storage_path, provider_url, visibility_scope, videoperitacion_id')
-        .eq('id', artefactoId)
-        .single();
-    if (!art)
-        return c.json(err('NOT_FOUND', 'Artefacto no encontrado'), 404);
-    // Check visibility scope
-    const userRoles = user.roles ?? [];
-    const primaryRole = userRoles[0] ?? 'unknown';
-    if (art.visibility_scope === 'office' && !userRoles.some((role) => ['admin', 'supervisor', 'tramitador'].includes(role))) {
-        return c.json(err('FORBIDDEN', 'No tiene permiso para acceder a este artefacto'), 403);
+    let artefacto;
+    let accessRole = user.roles?.[0] ?? 'unknown';
+    try {
+        const access = await assertVpArtefactAccess(supabase, user.id, user.roles, artefactoId);
+        artefacto = access.artefacto;
+        accessRole = accessRole === 'unknown' ? access.accessRole : accessRole;
     }
-    if (art.visibility_scope === 'perito' && !userRoles.some((role) => ['admin', 'supervisor', 'tramitador', 'perito'].includes(role))) {
-        return c.json(err('FORBIDDEN', 'No tiene permiso para acceder a este artefacto'), 403);
+    catch (error) {
+        if (error instanceof VpArtefactAccessError) {
+            return c.json(err(error.code, error.message), error.status);
+        }
+        throw error;
     }
     // Record access
     await supabase.from('vp_accesos_artefacto').insert({
         artefacto_id: artefactoId,
         user_id: user.id,
-        user_role: primaryRole,
-        access_type: 'view',
+        user_role: accessRole,
+        access_type: 'download',
         ip: c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? null,
         user_agent: c.req.header('user-agent') ?? null,
     });
     // Return signed URL or provider URL
-    let url = art.provider_url;
-    if (!url && art.storage_path) {
+    let url = artefacto.provider_url;
+    if (!url && artefacto.storage_path) {
         const { data: signed } = await supabase.storage
             .from('vp-artefactos')
-            .createSignedUrl(art.storage_path, 3600);
+            .createSignedUrl(artefacto.storage_path, VP_SIGNED_URL_TTL_SECONDS);
         url = signed?.signedUrl ?? null;
     }
-    return c.json({ data: { url, expires_in: 3600 }, error: null });
+    if (!url) {
+        return c.json(err('NOT_FOUND', 'El artefacto no tiene un origen descargable'), 404);
+    }
+    return c.json({ data: { url, expires_in: VP_SIGNED_URL_TTL_SECONDS }, error: null });
 });
 // GET /:id/transcripciones/:transcripcionId — single transcript detail
 videoperitacionesRoutes.get('/:id/transcripciones/:transcripcionId', async (c) => {
@@ -1013,12 +1049,18 @@ videoperitacionesRoutes.post('/:id/emitir-dictamen', async (c) => {
     }
     // Timeline + audit + domain event + alert to office
     await Promise.all([
-        supabase.from('comunicaciones').insert({
-            expediente_id: vp?.expediente_id ?? dictamen.expediente_id,
-            tipo: 'nota_interna', emisor_tipo: 'perito',
-            asunto: `Dictamen VP emitido: ${body.tipo_resolucion}`,
-            contenido: `El perito ha emitido dictamen de tipo "${body.tipo_resolucion}". Conclusiones: ${body.conclusiones.substring(0, 300)}`,
-            actor_id: user.id,
+        insertVpExpedienteTimeline(supabase, user, {
+            expedienteId: vp?.expediente_id ?? dictamen.expediente_id,
+            type: 'nota_interna',
+            actorScope: 'perito',
+            subject: `Dictamen VP emitido: ${body.tipo_resolucion}`,
+            content: `El perito ha emitido dictamen de tipo "${body.tipo_resolucion}". Conclusiones: ${body.conclusiones.substring(0, 300)}`,
+            metadata: {
+                videoperitacion_id: id,
+                referencia_tipo: 'videoperitacion',
+                referencia_id: id,
+                tipo_resolucion: body.tipo_resolucion,
+            },
         }),
         supabase.from('auditoria').insert({
             tabla: 'vp_dictamenes', registro_id: dictamen.id, accion: 'UPDATE',
@@ -1082,11 +1124,17 @@ videoperitacionesRoutes.post('/:id/solicitar-mas-informacion', async (c) => {
     await supabase.from('vp_videoperitaciones')
         .update({ estado: 'pendiente_perito', updated_at: new Date().toISOString() }).eq('id', id);
     await Promise.all([
-        supabase.from('comunicaciones').insert({
-            expediente_id: vp.expediente_id, tipo: 'nota_interna', emisor_tipo: 'perito',
-            asunto: 'Solicitud de más información (VP)',
-            contenido: `El perito solicita información adicional: ${body.informacion_solicitada}`,
-            actor_id: user.id,
+        insertVpExpedienteTimeline(supabase, user, {
+            expedienteId: vp.expediente_id,
+            type: 'nota_interna',
+            actorScope: 'perito',
+            subject: 'Solicitud de mas informacion (VP)',
+            content: `El perito solicita informacion adicional: ${body.informacion_solicitada}`,
+            metadata: {
+                videoperitacion_id: id,
+                referencia_tipo: 'videoperitacion',
+                referencia_id: id,
+            },
         }),
         supabase.from('alertas').insert({
             tipo: 'solicitud_informacion_vp', titulo: 'Perito solicita más información',
@@ -1153,11 +1201,17 @@ videoperitacionesRoutes.post('/:id/aprobar', async (c) => {
         }
     }
     await Promise.all([
-        supabase.from('comunicaciones').insert({
-            expediente_id: vp.expediente_id, tipo: 'nota_interna', emisor_tipo: 'perito',
-            asunto: 'Videoperitación aprobada',
-            contenido: `El perito ha aprobado la videoperitación. ${body.conclusiones.substring(0, 300)}`,
-            actor_id: user.id,
+        insertVpExpedienteTimeline(supabase, user, {
+            expedienteId: vp.expediente_id,
+            type: 'nota_interna',
+            actorScope: 'perito',
+            subject: 'Videoperitacion aprobada',
+            content: `El perito ha aprobado la videoperitacion. ${body.conclusiones.substring(0, 300)}`,
+            metadata: {
+                videoperitacion_id: id,
+                referencia_tipo: 'videoperitacion',
+                referencia_id: id,
+            },
         }),
         supabase.from('alertas').insert({
             tipo: 'vp_aprobada', titulo: 'Videoperitación aprobada por perito',
@@ -1207,11 +1261,17 @@ videoperitacionesRoutes.post('/:id/rechazar', async (c) => {
     await supabase.from('vp_videoperitaciones')
         .update({ estado: 'pendiente_perito', updated_at: now }).eq('id', id);
     await Promise.all([
-        supabase.from('comunicaciones').insert({
-            expediente_id: vp.expediente_id, tipo: 'nota_interna', emisor_tipo: 'perito',
-            asunto: 'Videoperitación rechazada',
-            contenido: `El perito ha rechazado la videoperitación. Motivo: ${body.motivo_rechazo}`,
-            actor_id: user.id,
+        insertVpExpedienteTimeline(supabase, user, {
+            expedienteId: vp.expediente_id,
+            type: 'nota_interna',
+            actorScope: 'perito',
+            subject: 'Videoperitacion rechazada',
+            content: `El perito ha rechazado la videoperitacion. Motivo: ${body.motivo_rechazo}`,
+            metadata: {
+                videoperitacion_id: id,
+                referencia_tipo: 'videoperitacion',
+                referencia_id: id,
+            },
         }),
         supabase.from('alertas').insert({
             tipo: 'vp_rechazada', titulo: 'Videoperitación rechazada por perito',
@@ -1254,11 +1314,17 @@ videoperitacionesRoutes.post('/:id/instruccion', async (c) => {
     if (iErr)
         return c.json(err('DB_ERROR', iErr.message), 500);
     await Promise.all([
-        supabase.from('comunicaciones').insert({
-            expediente_id: vp.expediente_id, tipo: 'nota_interna', emisor_tipo: 'perito',
-            asunto: `Instrucción pericial: ${body.tipo}`,
-            contenido: body.descripcion,
-            actor_id: user.id,
+        insertVpExpedienteTimeline(supabase, user, {
+            expedienteId: vp.expediente_id,
+            type: 'nota_interna',
+            actorScope: 'perito',
+            subject: `Instruccion pericial: ${body.tipo}`,
+            content: body.descripcion,
+            metadata: {
+                videoperitacion_id: id,
+                referencia_tipo: 'videoperitacion',
+                referencia_id: id,
+            },
         }),
         supabase.from('alertas').insert({
             tipo: 'instruccion_pericial', titulo: `Instrucción pericial: ${body.tipo}`,
@@ -1490,10 +1556,19 @@ videoperitacionesRoutes.post('/:id/informes', async (c) => {
     await supabase.from('vp_videoperitaciones').update({ estado: 'informe_borrador' }).eq('id', id);
     // Timeline + audit + domain event
     await Promise.all([
-        supabase.from('comunicaciones').insert({
-            expediente_id: vp.expediente_id, tipo: 'nota_interna', canal: 'sistema',
-            descripcion: `Informe técnico VP creado (borrador v1)`,
-            prioridad: 'media', referencia_tipo: 'videoperitacion', referencia_id: id,
+        insertVpExpedienteTimeline(supabase, user, {
+            expedienteId: vp.expediente_id,
+            type: 'sistema',
+            actorScope: 'sistema',
+            actorName: 'Sistema ERP',
+            subject: 'Informe tecnico VP creado',
+            content: 'Informe tecnico VP creado (borrador v1)',
+            metadata: {
+                prioridad: 'media',
+                referencia_tipo: 'videoperitacion',
+                referencia_id: id,
+                videoperitacion_id: id,
+            },
         }),
         supabase.from('auditoria').insert({
             tabla: 'vp_informes', registro_id: informe.id, accion: 'INSERT',
@@ -1603,10 +1678,19 @@ videoperitacionesRoutes.post('/:id/informes/:iid/enviar-revision', async (c) => 
         return c.json({ data: null, error: { code: 'DB_ERROR', message: updateErr.message } }, 500);
     const { data: vp } = await supabase.from('vp_videoperitaciones').select('expediente_id').eq('id', id).single();
     await Promise.all([
-        supabase.from('comunicaciones').insert({
-            expediente_id: vp?.expediente_id, tipo: 'nota_interna', canal: 'sistema',
-            descripcion: `Informe VP enviado a revisión (v${informe.version})`,
-            prioridad: 'media', referencia_tipo: 'videoperitacion', referencia_id: id,
+        insertVpExpedienteTimeline(supabase, user, {
+            expedienteId: vp?.expediente_id,
+            type: 'sistema',
+            actorScope: 'sistema',
+            actorName: 'Sistema ERP',
+            subject: 'Informe VP enviado a revision',
+            content: `Informe VP enviado a revision (v${informe.version})`,
+            metadata: {
+                prioridad: 'media',
+                referencia_tipo: 'videoperitacion',
+                referencia_id: id,
+                videoperitacion_id: id,
+            },
         }),
         supabase.from('auditoria').insert({
             tabla: 'vp_informes', registro_id: iid, accion: 'UPDATE',
@@ -1693,10 +1777,19 @@ videoperitacionesRoutes.post('/:id/informes/:iid/validar', async (c) => {
         }
     }
     await Promise.all([
-        supabase.from('comunicaciones').insert({
-            expediente_id: vp?.expediente_id, tipo: 'nota_interna', canal: 'sistema',
-            descripcion: `Informe VP validado (v${informe.version})`,
-            prioridad: 'alta', referencia_tipo: 'videoperitacion', referencia_id: id,
+        insertVpExpedienteTimeline(supabase, user, {
+            expedienteId: vp?.expediente_id,
+            type: 'sistema',
+            actorScope: 'sistema',
+            actorName: 'Sistema ERP',
+            subject: 'Informe VP validado',
+            content: `Informe VP validado (v${informe.version})`,
+            metadata: {
+                prioridad: 'alta',
+                referencia_tipo: 'videoperitacion',
+                referencia_id: id,
+                videoperitacion_id: id,
+            },
         }),
         supabase.from('auditoria').insert({
             tabla: 'vp_informes', registro_id: iid, accion: 'UPDATE',
@@ -1753,10 +1846,19 @@ videoperitacionesRoutes.post('/:id/informes/:iid/rectificar', async (c) => {
     await supabase.from('vp_videoperitaciones').update({ estado: 'informe_borrador' }).eq('id', id);
     const { data: vp } = await supabase.from('vp_videoperitaciones').select('expediente_id').eq('id', id).single();
     await Promise.all([
-        supabase.from('comunicaciones').insert({
-            expediente_id: vp?.expediente_id, tipo: 'nota_interna', canal: 'sistema',
-            descripcion: `Informe VP rectificado: ${body.motivo}`,
-            prioridad: 'alta', referencia_tipo: 'videoperitacion', referencia_id: id,
+        insertVpExpedienteTimeline(supabase, user, {
+            expedienteId: vp?.expediente_id,
+            type: 'sistema',
+            actorScope: 'sistema',
+            actorName: 'Sistema ERP',
+            subject: 'Informe VP rectificado',
+            content: `Informe VP rectificado: ${body.motivo}`,
+            metadata: {
+                prioridad: 'alta',
+                referencia_tipo: 'videoperitacion',
+                referencia_id: id,
+                videoperitacion_id: id,
+            },
         }),
         supabase.from('auditoria').insert({
             tabla: 'vp_informes', registro_id: iid, accion: 'UPDATE',
@@ -1894,10 +1996,19 @@ videoperitacionesRoutes.post('/:id/calcular-valoracion', async (c) => {
         await supabase.from('vp_videoperitaciones').update({ estado: 'valoracion_calculada' }).eq('id', id);
     }
     await Promise.all([
-        supabase.from('comunicaciones').insert({
-            expediente_id: vp.expediente_id, tipo: 'nota_interna', canal: 'sistema',
-            descripcion: `Valoración VP calculada: ${importe_total}€ (baremo: ${baremo.nombre} v${baremo.version})`,
-            prioridad: 'media', referencia_tipo: 'videoperitacion', referencia_id: id,
+        insertVpExpedienteTimeline(supabase, user, {
+            expedienteId: vp.expediente_id,
+            type: 'sistema',
+            actorScope: 'sistema',
+            actorName: 'Sistema ERP',
+            subject: 'Valoracion VP calculada',
+            content: `Valoracion VP calculada: ${importe_total} EUR (baremo: ${baremo.nombre} v${baremo.version})`,
+            metadata: {
+                prioridad: 'media',
+                referencia_tipo: 'videoperitacion',
+                referencia_id: id,
+                videoperitacion_id: id,
+            },
         }),
         supabase.from('auditoria').insert({
             tabla: 'vp_valoraciones', registro_id: valoracionId, accion: existing ? 'UPDATE' : 'INSERT',
@@ -2164,10 +2275,19 @@ videoperitacionesRoutes.post('/:id/documento-final/generar', async (c) => {
     if (insertErr)
         return c.json({ data: null, error: { code: 'DB_ERROR', message: insertErr.message } }, 500);
     await Promise.all([
-        supabase.from('comunicaciones').insert({
-            expediente_id: vp.expediente_id, tipo: 'nota_interna', canal: 'sistema',
-            descripcion: `Documento final VP generado (v${newVersion})`,
-            prioridad: 'media', referencia_tipo: 'videoperitacion', referencia_id: id,
+        insertVpExpedienteTimeline(supabase, user, {
+            expedienteId: vp.expediente_id,
+            type: 'sistema',
+            actorScope: 'sistema',
+            actorName: 'Sistema ERP',
+            subject: 'Documento final VP generado',
+            content: `Documento final VP generado (v${newVersion})`,
+            metadata: {
+                prioridad: 'media',
+                referencia_tipo: 'videoperitacion',
+                referencia_id: id,
+                videoperitacion_id: id,
+            },
         }),
         supabase.from('auditoria').insert({
             tabla: 'vp_documento_final', registro_id: doc.id, accion: 'INSERT',
@@ -2343,10 +2463,19 @@ videoperitacionesRoutes.post('/:id/emitir-factura', async (c) => {
     // Update VP estado
     await supabase.from('vp_videoperitaciones').update({ estado: 'facturado' }).eq('id', id);
     await Promise.all([
-        supabase.from('comunicaciones').insert({
-            expediente_id: vp.expediente_id, tipo: 'nota_interna', canal: 'sistema',
-            descripcion: `Factura VP emitida: ${numero_factura} (${total}€)`,
-            prioridad: 'alta', referencia_tipo: 'videoperitacion', referencia_id: id,
+        insertVpExpedienteTimeline(supabase, user, {
+            expedienteId: vp.expediente_id,
+            type: 'sistema',
+            actorScope: 'sistema',
+            actorName: 'Sistema ERP',
+            subject: 'Factura VP emitida',
+            content: `Factura VP emitida: ${numero_factura} (${total} EUR)`,
+            metadata: {
+                prioridad: 'alta',
+                referencia_tipo: 'videoperitacion',
+                referencia_id: id,
+                videoperitacion_id: id,
+            },
         }),
         supabase.from('auditoria').insert({
             tabla: 'vp_facturas', registro_id: vpFactura?.id ?? factura.id, accion: 'INSERT',
@@ -2456,13 +2585,22 @@ videoperitacionesRoutes.post('/:id/enviar-informe', async (c) => {
         await supabase.from('vp_documento_final').update({ estado: 'enviado' }).eq('id', doc.id);
     }
     await Promise.all([
-        supabase.from('comunicaciones').insert({
-            expediente_id: vp.expediente_id, tipo: 'nota_interna', canal: 'sistema',
-            descripcion: sendResult.success
+        insertVpExpedienteTimeline(supabase, user, {
+            expedienteId: vp.expediente_id,
+            type: 'sistema',
+            actorScope: 'sistema',
+            actorName: 'Sistema ERP',
+            subject: sendResult.success ? 'Informe VP enviado' : 'Error envio informe VP',
+            content: sendResult.success
                 ? `Informe VP enviado por ${canal} a ${body.destinatario_email ?? 'destinatario'}`
                 : `Error enviando informe VP: ${sendResult.error}`,
-            prioridad: sendResult.success ? 'media' : 'alta',
-            referencia_tipo: 'videoperitacion', referencia_id: id,
+            metadata: {
+                prioridad: sendResult.success ? 'media' : 'alta',
+                referencia_tipo: 'videoperitacion',
+                referencia_id: id,
+                videoperitacion_id: id,
+                dry_run: sendResult.dryRun,
+            },
         }),
         supabase.from('auditoria').insert({
             tabla: 'vp_envios', registro_id: envio.id, accion: 'INSERT',

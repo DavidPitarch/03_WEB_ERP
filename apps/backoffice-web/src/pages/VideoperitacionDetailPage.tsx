@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { api } from '@/lib/api';
 import {
   useVideoperitacionDetail,
   useVpComunicaciones,
@@ -101,6 +102,18 @@ export function VideoperitacionDetailPage() {
   const [uploadPath, setUploadPath] = useState('');
   const [uploadNotas, setUploadNotas] = useState('');
   const [uploadScope, setUploadScope] = useState<'office' | 'perito' | 'all'>('office');
+
+  const openArtefacto = async (artefactoId: string) => {
+    const result = await api.get<{ url: string }>(`/videoperitaciones/artefactos/${artefactoId}/signed-url`);
+    const signedUrl = result.data?.url;
+
+    if (!signedUrl) {
+      alert(result.error?.message ?? 'No se ha podido abrir el artefacto');
+      return;
+    }
+
+    window.open(signedUrl, '_blank', 'noopener,noreferrer');
+  };
 
   // Sprint 2: Transcripciones
   const [selectedTranscripcion, setSelectedTranscripcion] = useState<string | null>(null);
@@ -547,7 +560,7 @@ function ArtefactosSection({ vpId, showUpload, setShowUpload, uploadTipo, setUpl
                 Origen: {a.origen ?? '—'} &middot; {a.estado_disponibilidad ?? '—'} &middot; {a.visibility_scope ?? '—'}
               </div>
               <button className="btn btn-primary" style={{ marginTop: '0.5rem', fontSize: '0.8rem', padding: '0.25rem 0.5rem' }}
-                onClick={() => window.open(`/api/videoperitaciones/artefactos/${a.id}/signed-url`, '_blank')}>
+                onClick={() => void openArtefacto(a.id)}>
                 Ver
               </button>
             </div>

@@ -54,9 +54,10 @@ JOIN operarios o ON o.id = p.operario_id
 LEFT JOIN citas c ON c.id = p.cita_id;
 
 -- ─── RLS: operario puede leer sus propios partes ───
-CREATE POLICY IF NOT EXISTS partes_operario_select ON partes_operario FOR SELECT
+DROP POLICY IF EXISTS partes_operario_select ON partes_operario;
+
+CREATE POLICY partes_operario_select ON partes_operario FOR SELECT
   USING (
     operario_id IN (SELECT id FROM operarios WHERE user_id = auth.uid())
     OR auth.user_roles() && ARRAY['admin', 'supervisor', 'tramitador']
-    OR current_setting('role') = 'service_role'
   );

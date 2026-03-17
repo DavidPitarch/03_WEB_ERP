@@ -2,26 +2,26 @@
 -- R1-B.2: Storage bucket policies y ajustes operario
 -- ============================================================
 
--- ─── Storage bucket para evidencias ───
--- Nota: En Supabase, los buckets se crean vía Dashboard o CLI.
--- Este SQL documenta la configuración esperada:
+-- â”€â”€â”€ Storage bucket para evidencias â”€â”€â”€
+-- Nota: En Supabase, los buckets se crean vÃ­a Dashboard o CLI.
+-- Este SQL documenta la configuraciÃ³n esperada:
 --
 -- Bucket: "evidencias"
---   - Privado (no público)
---   - Signed URLs con duración: 3600s (1h) para descarga
---   - Upload vía signed URL generada por el backend
+--   - Privado (no pÃºblico)
+--   - Signed URLs con duraciÃ³n: 3600s (1h) para descarga
+--   - Upload vÃ­a signed URL generada por el backend
 --   - Path convention: evidencias/{expediente_id}/{upload_id}.{ext}
 --
--- Storage policies (se aplican vía supabase dashboard o storage API):
+-- Storage policies (se aplican vÃ­a supabase dashboard o storage API):
 -- 1. INSERT: solo service_role (backend genera signed URLs)
 -- 2. SELECT: service_role + usuarios con rol admin/supervisor/tramitador/operario
 -- 3. UPDATE: solo service_role
 -- 4. DELETE: solo service_role
 
--- ─── Índice para búsqueda rápida de partes por cita ───
+-- â”€â”€â”€ Ãndice para bÃºsqueda rÃ¡pida de partes por cita â”€â”€â”€
 CREATE INDEX IF NOT EXISTS idx_partes_cita ON partes_operario(cita_id);
 
--- ─── Vista: partes con detalles para backoffice ───
+-- â”€â”€â”€ Vista: partes con detalles para backoffice â”€â”€â”€
 CREATE OR REPLACE VIEW v_partes_backoffice AS
 SELECT
   p.id,
@@ -53,11 +53,11 @@ FROM partes_operario p
 JOIN operarios o ON o.id = p.operario_id
 LEFT JOIN citas c ON c.id = p.cita_id;
 
--- ─── RLS: operario puede leer sus propios partes ───
+-- â”€â”€â”€ RLS: operario puede leer sus propios partes â”€â”€â”€
 DROP POLICY IF EXISTS partes_operario_select ON partes_operario;
 
 CREATE POLICY partes_operario_select ON partes_operario FOR SELECT
   USING (
     operario_id IN (SELECT id FROM operarios WHERE user_id = auth.uid())
-    OR auth.user_roles() && ARRAY['admin', 'supervisor', 'tramitador']
+    OR public.user_roles() && ARRAY['admin', 'supervisor', 'tramitador']
   );

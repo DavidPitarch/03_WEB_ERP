@@ -23,6 +23,33 @@ CREATE TABLE IF NOT EXISTS proveedores (
     updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'proveedores' AND column_name = 'direccion') THEN
+        ALTER TABLE proveedores ADD COLUMN direccion TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'proveedores' AND column_name = 'codigo_postal') THEN
+        ALTER TABLE proveedores ADD COLUMN codigo_postal TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'proveedores' AND column_name = 'localidad') THEN
+        ALTER TABLE proveedores ADD COLUMN localidad TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'proveedores' AND column_name = 'provincia') THEN
+        ALTER TABLE proveedores ADD COLUMN provincia TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'proveedores' AND column_name = 'canal_preferido') THEN
+        ALTER TABLE proveedores ADD COLUMN canal_preferido TEXT DEFAULT 'email';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'proveedores' AND column_name = 'especialidades') THEN
+        ALTER TABLE proveedores ADD COLUMN especialidades TEXT[] DEFAULT '{}';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'proveedores' AND column_name = 'notas') THEN
+        ALTER TABLE proveedores ADD COLUMN notas TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'proveedores' AND column_name = 'updated_at') THEN
+        ALTER TABLE proveedores ADD COLUMN updated_at TIMESTAMPTZ DEFAULT now();
+    END IF;
+END $$;
+
 -- ============================================================
 -- 2. TABLA: pedidos_material
 -- ============================================================
@@ -52,6 +79,67 @@ CREATE TABLE IF NOT EXISTS pedidos_material (
     updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pedidos_material' AND column_name = 'cita_id') THEN
+        ALTER TABLE pedidos_material ADD COLUMN cita_id UUID REFERENCES citas(id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pedidos_material' AND column_name = 'numero_pedido') THEN
+        ALTER TABLE pedidos_material ADD COLUMN numero_pedido TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pedidos_material' AND column_name = 'observaciones') THEN
+        ALTER TABLE pedidos_material ADD COLUMN observaciones TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pedidos_material' AND column_name = 'enviado_at') THEN
+        ALTER TABLE pedidos_material ADD COLUMN enviado_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pedidos_material' AND column_name = 'enviado_por') THEN
+        ALTER TABLE pedidos_material ADD COLUMN enviado_por UUID;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pedidos_material' AND column_name = 'envio_error') THEN
+        ALTER TABLE pedidos_material ADD COLUMN envio_error TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pedidos_material' AND column_name = 'confirmado_at') THEN
+        ALTER TABLE pedidos_material ADD COLUMN confirmado_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pedidos_material' AND column_name = 'recogido_at') THEN
+        ALTER TABLE pedidos_material ADD COLUMN recogido_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pedidos_material' AND column_name = 'recogido_por') THEN
+        ALTER TABLE pedidos_material ADD COLUMN recogido_por UUID;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pedidos_material' AND column_name = 'cancelado_at') THEN
+        ALTER TABLE pedidos_material ADD COLUMN cancelado_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pedidos_material' AND column_name = 'cancelado_motivo') THEN
+        ALTER TABLE pedidos_material ADD COLUMN cancelado_motivo TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pedidos_material' AND column_name = 'caducado_at') THEN
+        ALTER TABLE pedidos_material ADD COLUMN caducado_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pedidos_material' AND column_name = 'token_confirmacion') THEN
+        ALTER TABLE pedidos_material ADD COLUMN token_confirmacion TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pedidos_material' AND column_name = 'token_expira_at') THEN
+        ALTER TABLE pedidos_material ADD COLUMN token_expira_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pedidos_material' AND column_name = 'created_by') THEN
+        ALTER TABLE pedidos_material ADD COLUMN created_by UUID;
+    END IF;
+END $$;
+
+UPDATE pedidos_material
+SET numero_pedido = COALESCE(numero_pedido, 'PED-' || to_char(created_at, 'YYYYMMDD') || '-' || substring(id::text, 1, 8)),
+    observaciones = COALESCE(observaciones, notas),
+    created_by = COALESCE(created_by, solicitado_por)
+WHERE numero_pedido IS NULL
+   OR observaciones IS NULL
+   OR created_by IS NULL;
+
+ALTER TABLE pedidos_material ALTER COLUMN numero_pedido SET NOT NULL;
+ALTER TABLE pedidos_material ALTER COLUMN created_by SET NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pedidos_material_numero_pedido_unique ON pedidos_material(numero_pedido);
+
 -- ============================================================
 -- 3. TABLA: lineas_pedido
 -- ============================================================
@@ -66,6 +154,15 @@ CREATE TABLE IF NOT EXISTS lineas_pedido (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'lineas_pedido' AND column_name = 'referencia') THEN
+        ALTER TABLE lineas_pedido ADD COLUMN referencia TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'lineas_pedido' AND column_name = 'notas') THEN
+        ALTER TABLE lineas_pedido ADD COLUMN notas TEXT;
+    END IF;
+END $$;
+
 -- ============================================================
 -- 4. TABLA: confirmaciones_proveedor
 -- ============================================================
@@ -77,6 +174,18 @@ CREATE TABLE IF NOT EXISTS confirmaciones_proveedor (
     user_agent TEXT,
     confirmado_at TIMESTAMPTZ DEFAULT now()
 );
+
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'confirmaciones_proveedor' AND column_name = 'token') THEN
+        ALTER TABLE confirmaciones_proveedor ADD COLUMN token TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'confirmaciones_proveedor' AND column_name = 'ip') THEN
+        ALTER TABLE confirmaciones_proveedor ADD COLUMN ip TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'confirmaciones_proveedor' AND column_name = 'user_agent') THEN
+        ALTER TABLE confirmaciones_proveedor ADD COLUMN user_agent TEXT;
+    END IF;
+END $$;
 
 -- ============================================================
 -- 5. TABLA: historial_pedido

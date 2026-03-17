@@ -202,73 +202,31 @@ ALTER TABLE seguimiento_cobro ENABLE ROW LEVEL SECURITY;
 -- series_facturacion: staff can read
 CREATE POLICY "staff_read_series" ON series_facturacion
   FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_profiles up
-      WHERE up.id = auth.uid()
-        AND up.role IN ('admin', 'supervisor', 'financiero', 'direccion')
-    )
-  );
+  USING (public.user_roles() && ARRAY['admin', 'supervisor', 'financiero', 'direccion']);
 
 -- series_facturacion: admin/financiero can insert/update
 CREATE POLICY "admin_financiero_manage_series" ON series_facturacion
   FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_profiles up
-      WHERE up.id = auth.uid()
-        AND up.role IN ('admin', 'financiero')
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM user_profiles up
-      WHERE up.id = auth.uid()
-        AND up.role IN ('admin', 'financiero')
-    )
-  );
+  USING (public.user_roles() && ARRAY['admin', 'financiero'])
+  WITH CHECK (public.user_roles() && ARRAY['admin', 'financiero']);
 
 -- seguimiento_cobro: staff can read
 CREATE POLICY "staff_read_seguimiento" ON seguimiento_cobro
   FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_profiles up
-      WHERE up.id = auth.uid()
-        AND up.role IN ('admin', 'supervisor', 'financiero', 'direccion')
-    )
-  );
+  USING (public.user_roles() && ARRAY['admin', 'supervisor', 'financiero', 'direccion']);
 
 -- seguimiento_cobro: admin/financiero can insert/update
 CREATE POLICY "admin_financiero_manage_seguimiento" ON seguimiento_cobro
   FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_profiles up
-      WHERE up.id = auth.uid()
-        AND up.role IN ('admin', 'financiero')
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM user_profiles up
-      WHERE up.id = auth.uid()
-        AND up.role IN ('admin', 'financiero')
-    )
-  );
+  USING (public.user_roles() && ARRAY['admin', 'financiero'])
+  WITH CHECK (public.user_roles() && ARRAY['admin', 'financiero']);
 
 -- facturas RLS: staff can read all
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'facturas' AND policyname = 'staff_read_facturas') THEN
     CREATE POLICY "staff_read_facturas" ON facturas
       FOR SELECT
-      USING (
-        EXISTS (
-          SELECT 1 FROM user_profiles up
-          WHERE up.id = auth.uid()
-            AND up.role IN ('admin', 'supervisor', 'financiero', 'direccion')
-        )
-      );
+      USING (public.user_roles() && ARRAY['admin', 'supervisor', 'financiero', 'direccion']);
   END IF;
 END $$;
 
@@ -277,20 +235,8 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'facturas' AND policyname = 'admin_financiero_manage_facturas') THEN
     CREATE POLICY "admin_financiero_manage_facturas" ON facturas
       FOR ALL
-      USING (
-        EXISTS (
-          SELECT 1 FROM user_profiles up
-          WHERE up.id = auth.uid()
-            AND up.role IN ('admin', 'financiero')
-        )
-      )
-      WITH CHECK (
-        EXISTS (
-          SELECT 1 FROM user_profiles up
-          WHERE up.id = auth.uid()
-            AND up.role IN ('admin', 'financiero')
-        )
-      );
+      USING (public.user_roles() && ARRAY['admin', 'financiero'])
+      WITH CHECK (public.user_roles() && ARRAY['admin', 'financiero']);
   END IF;
 END $$;
 
@@ -299,13 +245,7 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'pagos' AND policyname = 'staff_read_pagos') THEN
     CREATE POLICY "staff_read_pagos" ON pagos
       FOR SELECT
-      USING (
-        EXISTS (
-          SELECT 1 FROM user_profiles up
-          WHERE up.id = auth.uid()
-            AND up.role IN ('admin', 'supervisor', 'financiero', 'direccion')
-        )
-      );
+      USING (public.user_roles() && ARRAY['admin', 'supervisor', 'financiero', 'direccion']);
   END IF;
 END $$;
 
@@ -320,21 +260,38 @@ ALTER PUBLICATION supabase_realtime ADD TABLE facturas, seguimiento_cobro;
 
 -- Series de facturación
 INSERT INTO series_facturacion (codigo, nombre, prefijo, empresa_facturadora_id, tipo, contador_actual, activa)
-VALUES
-  ('F', 'Facturas ordinarias', 'F-', (SELECT id FROM empresas_facturadoras LIMIT 1), 'ordinaria', 0, true),
-  ('R', 'Rectificativas', 'R-', (SELECT id FROM empresas_facturadoras LIMIT 1), 'rectificativa', 0, true)
+SELECT
+  seed.codigo,
+  seed.nombre,
+  seed.prefijo,
+  ef.id,
+  seed.tipo,
+  seed.contador_actual,
+  seed.activa
+FROM empresas_facturadoras ef
+JOIN (
+  VALUES
+    ('F', 'Facturas ordinarias', 'F-', 'ordinaria', 0, true),
+    ('R', 'Rectificativas', 'R-', 'rectificativa', 0, true)
+) AS seed(codigo, nombre, prefijo, tipo, contador_actual, activa) ON TRUE
+WHERE ef.id = (
+  SELECT id
+  FROM empresas_facturadoras
+  ORDER BY created_at
+  LIMIT 1
+)
 ON CONFLICT (codigo) DO NOTHING;
 
 -- Calendario laboral 2026 - festivos nacionales España
-INSERT INTO calendario_laboral (fecha, descripcion) VALUES
-  ('2026-01-01', 'Año Nuevo'),
-  ('2026-01-06', 'Reyes'),
-  ('2026-04-03', 'Viernes Santo'),
-  ('2026-05-01', 'Dia del Trabajo'),
-  ('2026-08-15', 'Asuncion'),
-  ('2026-10-12', 'Fiesta Nacional'),
-  ('2026-11-02', 'Todos los Santos'),
-  ('2026-12-07', 'Constitucion'),
-  ('2026-12-08', 'Inmaculada'),
-  ('2026-12-25', 'Navidad')
+INSERT INTO calendario_laboral (fecha, tipo, descripcion) VALUES
+  ('2026-01-01', 'festivo_nacional', 'Año Nuevo'),
+  ('2026-01-06', 'festivo_nacional', 'Reyes'),
+  ('2026-04-03', 'festivo_nacional', 'Viernes Santo'),
+  ('2026-05-01', 'festivo_nacional', 'Dia del Trabajo'),
+  ('2026-08-15', 'festivo_nacional', 'Asuncion'),
+  ('2026-10-12', 'festivo_nacional', 'Fiesta Nacional'),
+  ('2026-11-02', 'festivo_nacional', 'Todos los Santos'),
+  ('2026-12-07', 'festivo_nacional', 'Constitucion'),
+  ('2026-12-08', 'festivo_nacional', 'Inmaculada'),
+  ('2026-12-25', 'festivo_nacional', 'Navidad')
 ON CONFLICT DO NOTHING;

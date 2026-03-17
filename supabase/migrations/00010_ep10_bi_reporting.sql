@@ -3,6 +3,32 @@
 -- Idempotent: uses IF NOT EXISTS, CREATE OR REPLACE VIEW, DO $$ blocks
 -- ============================================================================
 
+CREATE OR REPLACE FUNCTION public.get_my_role()
+RETURNS TEXT AS $$
+  SELECT role_name
+  FROM (
+    SELECT
+      r.nombre AS role_name,
+      CASE r.nombre
+        WHEN 'admin' THEN 1
+        WHEN 'supervisor' THEN 2
+        WHEN 'direccion' THEN 3
+        WHEN 'financiero' THEN 4
+        WHEN 'tramitador' THEN 5
+        WHEN 'perito' THEN 6
+        WHEN 'operario' THEN 7
+        WHEN 'proveedor' THEN 8
+        WHEN 'cliente_final' THEN 9
+        ELSE 99
+      END AS role_priority
+    FROM user_roles ur
+    JOIN roles r ON r.id = ur.role_id
+    WHERE ur.user_id = auth.uid()
+  ) ranked_roles
+  ORDER BY role_priority
+  LIMIT 1;
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
 -- ============================================================================
 -- 1. TABLE: autofacturas
 -- ============================================================================

@@ -2,12 +2,12 @@
 -- R1-B: Soporte para operator-pwa y flujo de partes
 -- ============================================================
 
--- ─── Estado de resultado de visita ───
+-- â”€â”€â”€ Estado de resultado de visita â”€â”€â”€
 CREATE TYPE resultado_visita AS ENUM (
   'completada', 'pendiente', 'ausente', 'requiere_material'
 );
 
--- ─── Ampliar partes_operario ───
+-- â”€â”€â”€ Ampliar partes_operario â”€â”€â”€
 ALTER TABLE partes_operario ADD COLUMN IF NOT EXISTS resultado resultado_visita;
 ALTER TABLE partes_operario ADD COLUMN IF NOT EXISTS motivo_resultado TEXT;
 ALTER TABLE partes_operario ADD COLUMN IF NOT EXISTS firma_storage_path TEXT;
@@ -17,7 +17,7 @@ ALTER TABLE partes_operario ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFA
 CREATE TRIGGER trg_partes_updated BEFORE UPDATE ON partes_operario
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
--- ─── Ampliar evidencias con clasificación ───
+-- â”€â”€â”€ Ampliar evidencias con clasificaciÃ³n â”€â”€â”€
 ALTER TABLE evidencias ADD COLUMN IF NOT EXISTS clasificacion VARCHAR(20) DEFAULT 'general';
 -- valores: 'antes', 'durante', 'despues', 'general'
 ALTER TABLE evidencias ADD COLUMN IF NOT EXISTS cita_id UUID REFERENCES citas(id);
@@ -25,13 +25,13 @@ ALTER TABLE evidencias ADD COLUMN IF NOT EXISTS cita_id UUID REFERENCES citas(id
 CREATE INDEX IF NOT EXISTS idx_evidencias_expediente ON evidencias(expediente_id);
 CREATE INDEX IF NOT EXISTS idx_evidencias_parte ON evidencias(parte_id);
 
--- ─── Índices para agenda del operario ───
+-- â”€â”€â”€ Ãndices para agenda del operario â”€â”€â”€
 CREATE INDEX IF NOT EXISTS idx_citas_operario_estado ON citas(operario_id, estado, fecha);
 CREATE INDEX IF NOT EXISTS idx_partes_expediente ON partes_operario(expediente_id);
 CREATE INDEX IF NOT EXISTS idx_partes_operario ON partes_operario(operario_id);
 
--- ─── RLS: operario puede INSERT partes y evidencias ───
--- Partes: el operario puede crear partes de expedientes asignados a él
+-- â”€â”€â”€ RLS: operario puede INSERT partes y evidencias â”€â”€â”€
+-- Partes: el operario puede crear partes de expedientes asignados a Ã©l
 CREATE POLICY partes_operario_insert ON partes_operario FOR INSERT
   WITH CHECK (
     operario_id IN (SELECT id FROM operarios WHERE user_id = auth.uid())
@@ -42,7 +42,7 @@ CREATE POLICY partes_operario_insert ON partes_operario FOR INSERT
 ALTER TABLE evidencias ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY evidencias_staff_select ON evidencias FOR SELECT
-  USING (auth.user_roles() && ARRAY['admin', 'supervisor', 'tramitador']);
+  USING (public.user_roles() && ARRAY['admin', 'supervisor', 'tramitador']);
 
 CREATE POLICY evidencias_operario_select ON evidencias FOR SELECT
   USING (
@@ -60,7 +60,7 @@ CREATE POLICY evidencias_insert ON evidencias FOR INSERT
     OR current_setting('role') = 'service_role'
   );
 
--- ─── Vista: agenda del operario ───
+-- â”€â”€â”€ Vista: agenda del operario â”€â”€â”€
 CREATE OR REPLACE VIEW v_agenda_operario AS
 SELECT
   c.id as cita_id,

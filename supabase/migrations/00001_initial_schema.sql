@@ -6,6 +6,21 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+DO $$
+BEGIN
+  IF to_regprocedure('public.uuid_generate_v4()') IS NULL THEN
+    EXECUTE $fn$
+      CREATE FUNCTION public.uuid_generate_v4()
+      RETURNS uuid
+      LANGUAGE sql
+      AS $body$
+        SELECT gen_random_uuid();
+      $body$;
+    $fn$;
+  END IF;
+END
+$$;
+
 -- ─── ENUMS ───
 CREATE TYPE expediente_estado AS ENUM (
   'NUEVO', 'NO_ASIGNADO', 'EN_PLANIFICACION', 'EN_CURSO',

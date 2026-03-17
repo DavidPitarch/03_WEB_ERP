@@ -4,6 +4,10 @@
 > Estado general: bloqueado por despliegue pendiente en Supabase objetivo
 > Decision vigente: EP-12 Customer Tracking sigue cerrado
 
+Runbook operativo asociado:
+
+- `docs/deployment/sprint-5.5-remote-gate-runbook.md`
+
 ## 1. Supabase objetivo
 
 - [x] Proyecto objetivo alcanzable
@@ -18,6 +22,8 @@ Evidencia remota actual:
 
 - `companias_status = 404` con `PGRST205`
 - `erp_create_expediente_status = 404` con `PGRST202`
+- `erp_create_cita_status = 404` con `PGRST202`
+- `erp_transition_expediente_status = 404` con `PGRST202`
 
 Conclusion:
 

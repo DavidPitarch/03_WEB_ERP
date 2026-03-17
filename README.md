@@ -1,5 +1,6 @@
-# ERP Siniestros del Hogar
+# 03_WEB_ERP - ERP Siniestros del Hogar
 
+Programa web gestión siniestros V3.
 Sistema ERP para gestión del ciclo de vida completo de expedientes de siniestros del hogar.
 
 ## Stack

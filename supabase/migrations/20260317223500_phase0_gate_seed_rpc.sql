@@ -1,18 +1,5 @@
 -- ============================================================
--- Sprint 5.5 Phase 0 - Seed minimo remoto para gate tecnico
--- Requiere: migraciones 00001..00018 aplicadas
--- Requiere: usuarios auth ya creados en Supabase Auth
--- Uso:
---   1. Ejecutar este archivo en SQL editor o via psql
---   2. Invocar:
---      SELECT * FROM public.erp_phase0_seed_minimo(
---        '<admin_user_id>',
---        '<supervisor_user_id>',
---        '<tramitador_user_id>',
---        '<financiero_user_id>',
---        '<operario_user_id>',
---        'operario.gate@erp.local'
---      );
+-- Sprint 5.5 Phase 0 - Seed minimo remoto via RPC
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.erp_phase0_seed_minimo(
@@ -35,7 +22,7 @@ AS $$
 DECLARE
   v_compania_id UUID := 'c0000001-0000-0000-0000-000000000001';
   v_empresa_facturadora_id UUID := 'e0000001-0000-0000-0000-000000000001';
-  v_operario_id UUID := 'f0000001-0000-0000-0000-000000000001';
+  v_operario_id UUID := 'o0000001-0000-0000-0000-000000000001';
 BEGIN
   INSERT INTO roles (nombre, descripcion)
   VALUES
@@ -162,3 +149,6 @@ BEGIN
   SELECT v_compania_id, v_empresa_facturadora_id, v_operario_id;
 END;
 $$;
+
+REVOKE ALL ON FUNCTION public.erp_phase0_seed_minimo(UUID, UUID, UUID, UUID, UUID, TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.erp_phase0_seed_minimo(UUID, UUID, UUID, UUID, UUID, TEXT) TO service_role;

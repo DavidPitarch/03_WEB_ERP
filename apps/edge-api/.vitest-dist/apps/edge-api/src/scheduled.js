@@ -1,33 +1,26 @@
-// ─── Cloudflare Scheduled Worker ───
-// Triggers: cron jobs for watchdogs, alerts, and expired items.
-// Configure in wrangler.toml:
-//   [triggers]
-//   crons = ["0 7 * * *", "0 13 * * *"]  # 7:00 and 13:00 UTC daily
 import { createClient } from '@supabase/supabase-js';
-export async function scheduled(_event, env, _ctx) {
+export async function runScheduledTasks(env) {
     const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
     const results = {};
-    // 1. Generate alerts (tareas vencidas, SLA próximo, partes pendientes, pendientes sin revisión)
     try {
         const { data: alertRes } = await supabase.rpc('generate_alerts_batch');
         results.alertas = alertRes ?? 'rpc executed';
     }
     catch {
-        // Fallback: generate alerts via watchdog queries
         results.alertas = await generateAlertsManual(supabase);
     }
-    // 2. Detect expired pedidos
     results.pedidos_caducados = await detectPedidosCaducados(supabase);
-    // 3. Detect facturas vencidas (update estado_cobro)
     results.facturas_vencidas = await detectFacturasVencidas(supabase);
-    // 4. Detect informes caducados (citas sin parte)
     results.informes_caducados = await detectInformesCaducados(supabase);
+    return results;
+}
+export async function scheduled(_event, env, _ctx) {
+    const results = await runScheduledTasks(env);
     console.log('[SCHEDULED]', new Date().toISOString(), results);
 }
 async function generateAlertsManual(supabase) {
     const now = new Date().toISOString();
     let count = 0;
-    // Tareas vencidas
     const { data: tareasVencidas } = await supabase
         .from('tareas_internas')
         .select('id, expediente_id, titulo, asignado_a')
@@ -46,13 +39,11 @@ async function generateAlertsManual(supabase) {
         if (!error)
             count++;
     }
-    // SLA próximo a vencer (>80% consumido)
-    const { data: expSla } = await supabase
+    await supabase
         .from('expedientes')
         .select('id, numero_expediente')
         .not('fecha_limite_sla', 'is', null)
         .not('estado', 'in', '(FINALIZADO,FACTURADO,COBRADO,CERRADO,CANCELADO)');
-    // Partes pendientes >3 días
     const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString();
     const { data: partesPendientes } = await supabase
         .from('partes_operario')
@@ -62,7 +53,7 @@ async function generateAlertsManual(supabase) {
     for (const p of partesPendientes ?? []) {
         await supabase.from('alertas').upsert({
             tipo: 'parte_pendiente_antiguo',
-            titulo: `Parte pendiente de validación >3 días`,
+            titulo: 'Parte pendiente de validacion >3 dias',
             expediente_id: p.expediente_id,
             prioridad: 'media',
             estado: 'activa',
@@ -88,7 +79,7 @@ async function detectPedidosCaducados(supabase) {
             pedido_id: p.id,
             estado_anterior: 'enviado',
             estado_nuevo: 'caducado',
-            motivo: 'Fecha límite superada (cron)',
+            motivo: 'Fecha limite superada (cron)',
         });
         count++;
     }
@@ -112,7 +103,6 @@ async function detectFacturasVencidas(supabase) {
     return { marked: count };
 }
 async function detectInformesCaducados(supabase) {
-    // Just count — the view v_informes_caducados already exists
     const { count } = await supabase
         .from('v_informes_caducados')
         .select('*', { count: 'exact', head: true });

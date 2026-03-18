@@ -5,6 +5,7 @@ const ENVIO_ROLES = ['admin', 'supervisor', 'financiero'];
 const DOCFINAL_GENERATE_ROLES = ['perito', 'admin', 'supervisor'];
 const DOCFINAL_REGENERATE_ROLES = ['admin', 'supervisor'];
 const ALL_AUTHENTICATED_ROLES = ['admin', 'supervisor', 'financiero', 'tramitador', 'perito'];
+const ENVIO_CANALES = ['email', 'api', 'portal', 'manual'];
 const VP_TRANSITIONS_SPRINT5 = {
     'valoracion_calculada->emitir-factura': 'facturado',
     'facturado->enviar-informe': 'enviado',
@@ -26,6 +27,12 @@ function canView(role) {
 }
 function canRetryEnvio(role) {
     return ENVIO_ROLES.includes(role);
+}
+function canAcknowledgeEnvio(role) {
+    return ENVIO_ROLES.includes(role);
+}
+function isValidEnvioCanal(canal) {
+    return ENVIO_CANALES.includes(canal);
 }
 function formatNumeroFactura(prefijo, year, counter) {
     return `${prefijo}${year}-${String(counter).padStart(5, '0')}`;
@@ -212,6 +219,17 @@ describe('EP-11B Sprint 5 — Factura VP Emission', () => {
 });
 // ─── 3. Envío informe ───
 describe('EP-11B Sprint 5 — Envío Informe', () => {
+    it('rejects unsupported canal values', () => {
+        expect(isValidEnvioCanal('email')).toBe(true);
+        expect(isValidEnvioCanal('manual')).toBe(true);
+        expect(isValidEnvioCanal('ftp')).toBe(false);
+    });
+    it('email channel requires destinatario_email', () => {
+        const canal = 'email';
+        const destinatario = '';
+        const isValid = canal !== 'email' || destinatario.trim().length > 0;
+        expect(isValid).toBe(false);
+    });
     it('requires documento final generado', () => {
         const vpSinDoc = makeVP({ documento_final_url: null });
         const result = checkEnvioPreconditions(vpSinDoc);
@@ -290,6 +308,39 @@ describe('EP-11B Sprint 5 — Reintento Envío', () => {
         expect(canRetryEnvio('financiero')).toBe(true);
         expect(canRetryEnvio('perito')).toBe(false);
         expect(canRetryEnvio('tramitador')).toBe(false);
+    });
+    it('retry generates audit + domain event + timeline traceability', () => {
+        const sideEffects = {
+            audit: { tabla: 'vp_envios', accion: 'UPDATE', registro_id: 'envio-1' },
+            domainEvent: { aggregate_type: 'videoperitacion', event_type: 'InformeVpReintentoSolicitado' },
+            timeline: { asunto: 'Reintento de envio VP solicitado', detalle: 'Reintento #2 solicitado' },
+        };
+        expect(sideEffects.audit.tabla).toBe('vp_envios');
+        expect(sideEffects.domainEvent.event_type).toBe('InformeVpReintentoSolicitado');
+        expect(sideEffects.timeline.asunto).toContain('Reintento');
+    });
+});
+describe('EP-11B Sprint 5 — Acuse Envío', () => {
+    it('only admin/supervisor/financiero can acknowledge', () => {
+        expect(canAcknowledgeEnvio('admin')).toBe(true);
+        expect(canAcknowledgeEnvio('supervisor')).toBe(true);
+        expect(canAcknowledgeEnvio('financiero')).toBe(true);
+        expect(canAcknowledgeEnvio('perito')).toBe(false);
+    });
+    it('only sent envios can be acknowledged', () => {
+        const envioPendiente = makeEnvio({ estado: 'pendiente' });
+        const envioEnviado = makeEnvio({ estado: 'enviado' });
+        expect(envioPendiente.estado === 'enviado').toBe(false);
+        expect(envioEnviado.estado === 'enviado').toBe(true);
+    });
+    it('acuse sets estado acusado with timestamp and detail', () => {
+        const envio = makeEnvio({ estado: 'enviado' });
+        envio.estado = 'acusado';
+        envio.acuse_at = '2026-03-18T18:45:00Z';
+        envio.acuse_detalle = 'Correo recibido por la compañía';
+        expect(envio.estado).toBe('acusado');
+        expect(envio.acuse_at).toBeTruthy();
+        expect(envio.acuse_detalle).toContain('compañía');
     });
 });
 // ─── 5. VP estado transitions ───

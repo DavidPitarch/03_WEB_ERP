@@ -23,6 +23,7 @@ import { autofacturasRoutes } from './routes/autofacturas';
 import { peritosRoutes } from './routes/peritos';
 import { videoperitacionesRoutes } from './routes/videoperitaciones';
 import { vpWebhooksRoutes } from './routes/vp-webhooks';
+import { internalRoutes } from './routes/internal';
 import { authMiddleware } from './middleware/auth';
 import { requireRoles } from './middleware/roles';
 import { OFFICE_ROLES, OPERATOR_ROLES, PERITO_ROUTE_ROLES, VIDEOPERITACION_ROLES } from './security/role-groups';
@@ -31,12 +32,16 @@ import type { Env } from './types';
 
 const app = new Hono<{ Bindings: Env }>();
 
+function getAllowedOrigins(envValue?: string): string[] {
+  const defaults = ['http://localhost:5173', 'http://localhost:5174'];
+  const extra = envValue?.split(',').map((origin) => origin.trim()).filter(Boolean) ?? [];
+  return [...new Set([...defaults, ...extra])];
+}
+
 // Global middleware
 app.use('*', logger());
 app.use('*', (c, next) => {
-  const defaults = ['http://localhost:5173', 'http://localhost:5174'];
-  const extra = c.env.ALLOWED_ORIGINS?.split(',').map((o: string) => o.trim()).filter(Boolean) ?? [];
-  const origins = [...defaults, ...extra];
+  const origins = getAllowedOrigins(c.env.ALLOWED_ORIGINS);
   return cors({ origin: origins, credentials: true })(c, next);
 });
 
@@ -123,6 +128,7 @@ protectRouteGroup('/facturas', requireRoles(['admin', 'supervisor', 'tramitador'
 protectRouteGroup('/operator', requireRoles(OPERATOR_ROLES));
 protectRouteGroup('/peritos', requireRoles(PERITO_ROUTE_ROLES));
 protectRouteGroup('/videoperitaciones', requireRoles(VIDEOPERITACION_ROLES));
+protectRouteGroup('/internal', requireRoles(['admin']));
 api.use('/facturas/:id/registrar-cobro', requireRoles(['admin', 'financiero']));
 api.use('/facturas/:id/registrar-cobro/*', requireRoles(['admin', 'financiero']));
 api.route('/expedientes', expedientesRoutes);
@@ -145,6 +151,7 @@ api.route('/dashboard', dashboardRoutes);
 api.route('/autofacturas', autofacturasRoutes);
 api.route('/peritos', peritosRoutes);
 api.route('/videoperitaciones', videoperitacionesRoutes);
+api.route('/internal', internalRoutes);
 
 app.route('/api/v1', api);
 

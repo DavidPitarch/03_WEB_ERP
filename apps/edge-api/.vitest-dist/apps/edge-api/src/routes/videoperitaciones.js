@@ -4,8 +4,13 @@ import { sendEmail } from '../services/email-sender';
 import { insertExpedienteTimelineEntry } from '../services/expediente-timeline';
 import { assertVpArtefactAccess, VP_SIGNED_URL_TTL_SECONDS, VpArtefactAccessError, } from '../services/vp-access';
 export const videoperitacionesRoutes = new Hono();
+const VP_ENVIO_ALLOWED_CHANNELS = new Set(['email', 'api', 'portal', 'manual']);
+const VP_ENVIO_MANAGE_ROLES = new Set(['admin', 'supervisor', 'financiero']);
 function err(code, message) {
     return { data: null, error: { code, message } };
+}
+function canManageVpEnvios(userRoles) {
+    return (userRoles ?? []).some((role) => VP_ENVIO_MANAGE_ROLES.has(role));
 }
 async function insertVpExpedienteTimeline(supabase, user, params) {
     return insertExpedienteTimelineEntry(supabase, {
@@ -2495,10 +2500,17 @@ videoperitacionesRoutes.post('/:id/enviar-informe', async (c) => {
     const supabase = c.get('supabase');
     const user = c.get('user');
     const id = c.req.param('id');
-    const isAllowed = user.roles?.some((r) => ['admin', 'supervisor', 'financiero'].includes(r));
-    if (!isAllowed)
+    if (!canManageVpEnvios(user.roles)) {
         return c.json({ data: null, error: { code: 'FORBIDDEN', message: 'No autorizado' } }, 403);
+    }
     const body = await c.req.json();
+    const canal = body.canal ?? 'email';
+    if (!VP_ENVIO_ALLOWED_CHANNELS.has(canal)) {
+        return c.json({ data: null, error: { code: 'VALIDATION', message: 'Canal de envio no soportado' } }, 422);
+    }
+    if (canal === 'email' && !body.destinatario_email?.trim()) {
+        return c.json({ data: null, error: { code: 'VALIDATION', message: 'destinatario_email es obligatorio para canal email' } }, 422);
+    }
     // Get VP
     const { data: vp } = await supabase
         .from('vp_videoperitaciones')
@@ -2520,7 +2532,6 @@ videoperitacionesRoutes.post('/:id/enviar-informe', async (c) => {
     const { count: prevAttempts } = await supabase
         .from('vp_envios').select('id', { count: 'exact', head: true })
         .eq('videoperitacion_id', id);
-    const canal = body.canal ?? 'email';
     const now = new Date().toISOString();
     // Create envio record
     const { data: envio, error: envioErr } = await supabase
@@ -2541,41 +2552,26 @@ videoperitacionesRoutes.post('/:id/enviar-informe', async (c) => {
     if (envioErr)
         return c.json({ data: null, error: { code: 'DB_ERROR', message: envioErr.message } }, 500);
     // Attempt send (email or stub)
-    let sendResult = { success: true, error: null, dryRun: false };
+    let sendResult = { success: true, error: null, dryRun: false, messageId: null };
     if (canal === 'email' && body.destinatario_email) {
-        try {
-            // Use existing email service if available
-            const apiKey = c.env.RESEND_API_KEY;
-            if (apiKey) {
-                const res = await fetch('https://api.resend.com/emails', {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        from: 'noreply@erp.local',
-                        to: body.destinatario_email,
-                        subject: `Informe de videoperitación - ${vp.expedientes?.numero_expediente}`,
-                        html: `<p>Adjunto informe de videoperitación para el expediente ${vp.expedientes?.numero_expediente}.</p><p>Documento: ${doc.nombre_archivo}</p>`,
-                    }),
-                });
-                sendResult.success = res.ok;
-                if (!res.ok)
-                    sendResult.error = `HTTP ${res.status}`;
-            }
-            else {
-                sendResult.dryRun = true;
-            }
-        }
-        catch (err) {
-            sendResult.success = false;
-            sendResult.error = err.message ?? 'Error de envío';
-        }
+        const emailResult = await sendEmail(c.env.RESEND_API_KEY, {
+            to: body.destinatario_email,
+            subject: `Informe de videoperitacion - ${vp.expedientes?.numero_expediente}`,
+            html: `<p>Adjunto informe de videoperitacion para el expediente ${vp.expedientes?.numero_expediente}.</p><p>Documento: ${doc.nombre_archivo}</p>`,
+        });
+        sendResult = {
+            success: emailResult.success,
+            error: emailResult.error ?? null,
+            dryRun: emailResult.dryRun,
+            messageId: emailResult.messageId ?? null,
+        };
     }
     // Update envio with result
     const envioUpdate = {
         estado: sendResult.success ? 'enviado' : 'error',
         enviado_at: sendResult.success ? now : null,
         error_detalle: sendResult.error,
-        metadata: { dry_run: sendResult.dryRun },
+        metadata: { dry_run: sendResult.dryRun, message_id: sendResult.messageId },
     };
     await supabase.from('vp_envios').update(envioUpdate).eq('id', envio.id);
     // Update VP estado if successful
@@ -2634,11 +2630,19 @@ videoperitacionesRoutes.post('/:id/envios/:eid/reintentar', async (c) => {
     const user = c.get('user');
     const id = c.req.param('id');
     const eid = c.req.param('eid');
-    const isAllowed = user.roles?.some((r) => ['admin', 'supervisor', 'financiero'].includes(r));
-    if (!isAllowed)
+    if (!canManageVpEnvios(user.roles)) {
         return c.json({ data: null, error: { code: 'FORBIDDEN', message: 'No autorizado' } }, 403);
+    }
+    const { data: vp } = await supabase
+        .from('vp_videoperitaciones')
+        .select('id, expediente_id')
+        .eq('id', id)
+        .maybeSingle();
+    if (!vp) {
+        return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'VP no encontrada' } }, 404);
+    }
     const { data: envio } = await supabase
-        .from('vp_envios').select('*').eq('id', eid).single();
+        .from('vp_envios').select('*').eq('id', eid).eq('videoperitacion_id', id).maybeSingle();
     if (!envio || envio.estado !== 'error') {
         return c.json({ data: null, error: { code: 'INVALID_STATE', message: 'Solo se pueden reintentar envíos con error' } }, 422);
     }
@@ -2648,9 +2652,97 @@ videoperitacionesRoutes.post('/:id/envios/:eid/reintentar', async (c) => {
         intento_numero: envio.intento_numero + 1,
         error_detalle: null,
     }).eq('id', eid);
-    await supabase.from('auditoria').insert({
-        tabla: 'vp_envios', registro_id: eid, accion: 'UPDATE',
-        actor_id: user.id, cambios: { action: 'reintentar', intento: envio.intento_numero + 1 },
-    });
+    await Promise.all([
+        insertVpExpedienteTimeline(supabase, user, {
+            expedienteId: vp.expediente_id,
+            type: 'sistema',
+            actorScope: 'sistema',
+            actorName: 'Sistema ERP',
+            subject: 'Reintento de envio VP solicitado',
+            content: `Reintento #${envio.intento_numero + 1} solicitado para el envio ${eid}`,
+            metadata: {
+                prioridad: 'media',
+                referencia_tipo: 'videoperitacion',
+                referencia_id: id,
+                videoperitacion_id: id,
+                envio_id: eid,
+            },
+        }),
+        supabase.from('auditoria').insert({
+            tabla: 'vp_envios', registro_id: eid, accion: 'UPDATE',
+            actor_id: user.id, cambios: { action: 'reintentar', intento: envio.intento_numero + 1 },
+        }),
+        insertDomainEvent(supabase, {
+            aggregate_id: id, aggregate_type: 'videoperitacion',
+            event_type: 'InformeVpReintentoSolicitado',
+            payload: { envio_id: eid, intento: envio.intento_numero + 1 },
+            actor_id: user.id,
+        }),
+    ]);
     return c.json({ data: { envio_id: eid, intento_numero: envio.intento_numero + 1, estado: 'pendiente' }, error: null });
+});
+// POST /:id/envios/:eid/acusar
+videoperitacionesRoutes.post('/:id/envios/:eid/acusar', async (c) => {
+    const supabase = c.get('supabase');
+    const user = c.get('user');
+    const id = c.req.param('id');
+    const eid = c.req.param('eid');
+    if (!canManageVpEnvios(user.roles)) {
+        return c.json({ data: null, error: { code: 'FORBIDDEN', message: 'No autorizado' } }, 403);
+    }
+    const body = await c.req.json().catch(() => ({}));
+    const { data: vp } = await supabase
+        .from('vp_videoperitaciones')
+        .select('id, expediente_id')
+        .eq('id', id)
+        .maybeSingle();
+    if (!vp) {
+        return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'VP no encontrada' } }, 404);
+    }
+    const { data: envio } = await supabase
+        .from('vp_envios')
+        .select('*')
+        .eq('id', eid)
+        .eq('videoperitacion_id', id)
+        .maybeSingle();
+    if (!envio || envio.estado !== 'enviado') {
+        return c.json({ data: null, error: { code: 'INVALID_STATE', message: 'Solo se pueden acusar envíos en estado enviado' } }, 422);
+    }
+    const acuseAt = new Date().toISOString();
+    const acuseDetalle = body.detalle?.trim() || null;
+    await supabase.from('vp_envios').update({
+        estado: 'acusado',
+        acuse_at: acuseAt,
+        acuse_detalle: acuseDetalle,
+    }).eq('id', eid);
+    await Promise.all([
+        insertVpExpedienteTimeline(supabase, user, {
+            expedienteId: vp.expediente_id,
+            type: 'sistema',
+            actorScope: 'sistema',
+            actorName: 'Sistema ERP',
+            subject: 'Acuse de envio VP registrado',
+            content: acuseDetalle
+                ? `Acuse registrado para el envio ${eid}: ${acuseDetalle}`
+                : `Acuse registrado para el envio ${eid}`,
+            metadata: {
+                prioridad: 'media',
+                referencia_tipo: 'videoperitacion',
+                referencia_id: id,
+                videoperitacion_id: id,
+                envio_id: eid,
+            },
+        }),
+        supabase.from('auditoria').insert({
+            tabla: 'vp_envios', registro_id: eid, accion: 'UPDATE',
+            actor_id: user.id, cambios: { action: 'acuse', acuse_at: acuseAt, acuse_detalle: acuseDetalle },
+        }),
+        insertDomainEvent(supabase, {
+            aggregate_id: id, aggregate_type: 'videoperitacion',
+            event_type: 'InformeVpAcusado',
+            payload: { envio_id: eid, acuse_at: acuseAt, acuse_detalle: acuseDetalle },
+            actor_id: user.id,
+        }),
+    ]);
+    return c.json({ data: { envio_id: eid, estado: 'acusado', acuse_at: acuseAt, acuse_detalle: acuseDetalle }, error: null });
 });

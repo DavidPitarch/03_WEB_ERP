@@ -1,56 +1,60 @@
-# EP-13 — Matriz de migración PWGS → ERP
+# EP-13 - Matriz de migracion PWGS -> ERP
 
-## Entidades principales
+Estado: vigente
+Objetivo: mapear origen legacy a esquema ERP real, sin nombres ni estados obsoletos.
 
-| PWGS (origen) | ERP (destino) | Transformación | Notas |
+## 1. Entidades principales
+
+| PWGS origen | ERP destino | Transformacion | Regla de control |
 |---|---|---|---|
-| `siniestros` | `expedientes` | Map campos + generar numero_expediente | Estado inicial = NUEVO |
-| `siniestros.estado` | `expedientes.estado` | Tabla equivalencia estados | Ver sección estados |
-| `asegurados` | `asegurados` | Dedup por DNI/NIE + normalización nombre | Split nombre completo → nombre + apellidos |
-| `companias` | `companias_aseguradoras` | 1:1 con limpieza CIF | Verificar duplicados por CIF |
-| `operarios` | `operarios` | Map gremios → array gremios[] | es_subcontratado desde tipo_contrato |
-| `citas` | `citas` | Map fecha + operario | Vincular a expediente migrado |
-| `partes` | `partes_operario` | Map resultado + trabajos | Evidencias como referencias Storage |
-| `facturas` | `facturas` | Map serie + numeración | Respetar numeración original |
-| `lineas_factura` | `lineas_factura` | 1:1 | Recalcular subtotales |
-| `cobros/pagos` | `pagos` | Map fecha + importe | Vincular a factura migrada |
-| `proveedores` | `proveedores` | Dedup por CIF | Normalizar datos contacto |
-| `pedidos_material` | `pedidos_material` | Map estado + líneas | Generar numero_pedido |
-| `presupuestos` | `presupuestos` | Map líneas + totales | Recalcular margen |
-| `baremos` | `baremos` + `partidas_baremo` | Split header/líneas | Tipo = compania por defecto |
-| `tareas` | `tareas_internas` | Map prioridad + estado | Vincular a expediente |
-| `documentos` | `documentos` | Map tipo + Storage ref | Migrar archivos a Supabase Storage |
+| `siniestros` | `expedientes` | normalizar claves, generar `numero_expediente` y mapear relacion con compania/asegurado | no cargar si faltan claves maestras |
+| `siniestros.estado` | `expedientes.estado` | tabla de equivalencia controlada | solo estados del enum vigente |
+| `companias` | `companias` | limpieza de codigo y CIF | deduplicar por codigo/CIF |
+| `empresas` de facturacion | `empresas_facturadoras` | normalizar CIF y direccion | una fila activa por CIF valido |
+| `clientes/asegurados` | `asegurados` | split nombre/apellidos, normalizar telefonos | deduplicar por NIF y contacto |
+| `operarios` | `operarios` | mapear gremios, zonas y `user_id` cuando exista | no activar sin usuario operativo si requiere login |
+| `peritos` | `peritos` | mapear especialidades y `compania_ids` | validar `user_id` y asignacion |
+| `citas` | `citas` | mapear agenda y operario | expediente ya migrado |
+| `partes` | `partes_operario` | mapear trabajo, resultado, pendientes | cita y expediente deben existir |
+| `adjuntos` | `evidencias`, `documentos`, `vp_artefactos` | mover binarios a Storage y persistir `storage_path` | sin bucket no hay cutover |
+| `facturas` | `facturas`, `lineas_factura` | respetar serie y numero si aplica | reconciliacion con total legacy |
+| `cobros/pagos` | `pagos` | mapear fecha, importe y referencia | factura migrada obligatoria |
+| `proveedores` | `proveedores` | limpieza CIF y canal preferido | deduplicacion por CIF/email |
+| `pedidos` | `pedidos_material`, `lineas_pedido` | normalizar estado e historial | proveedor y expediente obligatorios |
 
-## Equivalencia de estados expediente
+## 2. Equivalencia de estados de expediente
 
-| PWGS estado | ERP estado | Condición |
-|---|---|---|
-| `nuevo`, `registrado` | `NUEVO` | |
-| `asignado` | `ASIGNADO` | Si tiene operario |
-| `en_curso`, `activo` | `EN_CURSO` | |
-| `pend_informe` | `PENDIENTE_INFORME` | |
-| `pend_perito` | `PENDIENTE_PERITAJE` | |
-| `pend_material` | `PENDIENTE_MATERIAL` | |
-| `finalizado` | `FINALIZADO` | Si tiene parte validado |
-| `facturado` | `FACTURADO` | Si tiene factura emitida |
-| `cobrado` | `COBRADO` | Si tiene pago registrado |
-| `cerrado` | `CERRADO` | |
-| `anulado` | `ANULADO` | |
-| `rehusado` | `REHUSADO` | |
-| `revisado` | `EN_REVISION` | |
+| PWGS estado | ERP estado |
+|---|---|
+| `nuevo`, `registrado` | `NUEVO` |
+| `pendiente_asignacion` | `NO_ASIGNADO` |
+| `planificando`, `citando` | `EN_PLANIFICACION` |
+| `en_curso`, `activo` | `EN_CURSO` |
+| `pendiente` | `PENDIENTE` |
+| `pend_material` | `PENDIENTE_MATERIAL` |
+| `pend_perito` | `PENDIENTE_PERITO` |
+| `pend_cliente`, `cliente_ausente` | `PENDIENTE_CLIENTE` |
+| `finalizado` | `FINALIZADO` |
+| `facturado` | `FACTURADO` |
+| `cobrado` | `COBRADO` |
+| `cerrado` | `CERRADO` |
+| `cancelado`, `anulado` | `CANCELADO` |
 
-## Estrategia de migración
+## 3. Secuencia operativa de migracion
 
-1. **Staging**: cargar datos PWGS en tablas `stg_*` temporales
-2. **Validación**: verificar integridad referencial, detectar huérfanos
-3. **Deduplicación**: aplicar reglas (ver ep13-deduplicacion.md)
-4. **Transformación**: scripts SQL que mapean stg → tablas ERP
-5. **Verificación**: conteos, checksums, muestreo aleatorio
-6. **Cutover**: ventana de mantenimiento, migración final, verificación
+1. cargar extractos PWGS en staging `stg_*`
+2. ejecutar limpieza y deduplicacion
+3. resolver maestros: companias, empresas facturadoras, asegurados, operarios, peritos, proveedores
+4. cargar `expedientes`
+5. cargar `citas`, `partes_operario`, `comunicaciones`, `historial_estados`
+6. cargar finanzas y logistica
+7. mover binarios a buckets privados y actualizar `storage_path`
+8. ejecutar reconciliacion de conteos y muestreo
 
-## Riesgos
+## 4. Reglas de rechazo
 
-- Datos PWGS sin CIF/DNI impiden deduplicación → requiere limpieza manual previa
-- Estados PWGS no normalizados → posible pérdida de granularidad
-- Archivos en filesystem PWGS → migrar a Supabase Storage (batch upload)
-- Numeración facturas: respetar series existentes para continuidad fiscal
+- registro sin clave de negocio util
+- expediente sin compania o empresa facturadora resoluble
+- adjunto sin destino documental claro
+- factura sin cuadratura entre base, IVA y total
+- operario o perito sin correspondencia de identidad cuando el flujo requiera login

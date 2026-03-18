@@ -1,37 +1,38 @@
-# Hardening Checklist — R3-A
+# Hardening checklist - Sprint 5.5 final
 
-## Email real (Resend)
-- [x] `email-sender.ts` con integración Resend API
-- [x] Dry-run automático cuando `RESEND_API_KEY` no configurada
-- [x] `sendFacturaEmail` — envío factura con audit trail
-- [x] `sendPedidoEmail` — envío pedido con magic link
-- [ ] Configurar `RESEND_API_KEY` en Cloudflare Worker secrets
-- [ ] Configurar `CONFIRM_BASE_URL` en Cloudflare Worker secrets
-- [ ] Verificar dominio de envío en Resend dashboard
-- [ ] Test E2E envío real a buzón de pruebas
+Fecha de revision: 2026-03-18
 
-## Cloudflare Scheduled Worker (Cron)
-- [x] `scheduled.ts` con función `scheduled()`
-- [x] Alertas automáticas: tareas vencidas, partes pendientes >3 días
-- [x] Detección pedidos caducados
-- [x] Detección facturas vencidas
-- [x] Detección informes caducados
-- [ ] Añadir `[triggers] crons = ["0 6 * * *"]` en `wrangler.toml`
-- [ ] Deploy worker con scheduled trigger habilitado
+## Backend y seguridad
 
-## RLS
-- [x] Tests role isolation: staff vs non-staff para facturas y pedidos
-- [x] Tests permisos cobro: solo admin + financiero
-- [x] Test confirmación pedido pública (magic link sin auth)
-- [ ] Audit RLS policies en Supabase dashboard tras aplicar migración 00010
+- [x] grupos de rol aplicados por ruta en `apps/edge-api/src/index.ts`
+- [x] rate limiting en endpoints publicos sensibles
+- [x] CORS consolidado sin duplicados
+- [x] acceso VP a artefactos por scope y signed URL corta
+- [x] reintento de envio VP trazado en timeline, auditoria y evento de dominio
+- [x] acuse de envio VP expuesto en backend con persistencia explicita
 
-## UX fixes
-- [x] Baremo importer: dropdown compañía en vez de UUID manual
-- [x] Navegación actualizada con Dashboard, Rentabilidad, Reporting, Autofacturas
+## RLS y datos sensibles
 
-## Pendiente para producción
-- [ ] Rate limiting en endpoints públicos (confirm pedido)
-- [ ] CORS: reemplazar `erp.tu-dominio.com` por dominio real
-- [ ] Monitoring: alertas Cloudflare Workers errores
-- [ ] Backup: verificar políticas backup Supabase
-- [ ] Secrets rotation plan para RESEND_API_KEY y SUPABASE_SERVICE_ROLE_KEY
+- [x] RLS `00018` elimina policies VP/finanzas/documentos permisivas
+- [x] validacion remota por rol realizada para core y tablas sensibles principales
+- [x] correccion remota de RLS core `expedientes`
+- [ ] validacion positiva remota de dataset VP real
+
+## Storage y documental
+
+- [x] buckets privados remotos creados
+- [x] signed URL validada a nivel Supabase / service role
+- [x] acceso directo autenticado sin signed URL denegado
+- [ ] validacion E2E del flujo firmado via backend remoto desplegado
+
+## Jobs y watchdogs
+
+- [x] `scheduled.ts` implementado
+- [x] `wrangler.toml` con triggers `0 7 * * *` y `0 13 * * *`
+- [ ] evidencia remota de despliegue y ejecucion del worker
+
+## Produccion
+
+- [x] tests `@erp/edge-api` verdes
+- [x] typecheck `@erp/edge-api` verde
+- [ ] gate final en estado GO

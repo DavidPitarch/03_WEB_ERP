@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { logger } from 'hono/logger';
 import { createClient } from '@supabase/supabase-js';
+import { requestLoggerMiddleware } from './middleware/request-logger';
 import { expedientesRoutes } from './routes/expedientes';
 import { citasRoutes } from './routes/citas';
 import { intakeRoutes } from './routes/intake';
@@ -40,14 +40,35 @@ function getAllowedOrigins(envValue?: string): string[] {
 }
 
 // Global middleware
-app.use('*', logger());
+app.use('*', requestLoggerMiddleware());
 app.use('*', (c, next) => {
   const origins = getAllowedOrigins(c.env.ALLOWED_ORIGINS);
   return cors({ origin: origins, credentials: true })(c, next);
 });
 
-// Health check
-app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
+// Health check — reports degraded when optional-but-critical secrets are absent
+app.get('/health', (c) => {
+  const warnings: string[] = [];
+
+  if (!c.env.RESEND_API_KEY) {
+    warnings.push('RESEND_API_KEY not configured — email dispatch in dry-run mode');
+  }
+  if (!c.env.VP_WEBHOOK_SECRET) {
+    warnings.push('VP_WEBHOOK_SECRET not configured — VP webhooks will not be verified');
+  }
+  if (!c.env.CONFIRM_BASE_URL) {
+    warnings.push('CONFIRM_BASE_URL not configured — customer tracking links will be malformed');
+  }
+
+  const degraded = warnings.length > 0;
+
+  return c.json({
+    status: degraded ? 'degraded' : 'ok',
+    // Expose warnings in non-production to aid local dev; hide in production to avoid info leakage
+    ...(c.env.ENVIRONMENT !== 'production' && degraded ? { warnings } : {}),
+    timestamp: new Date().toISOString(),
+  }, degraded ? 207 : 200);
+});
 
 // ─── Rate limiter for public endpoints ───
 const rateLimitMap = new Map<string, { count: number; reset: number }>();

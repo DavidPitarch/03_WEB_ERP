@@ -15,6 +15,19 @@ import { insertAudit, insertDomainEvent } from './audit';
  * - Path: documentos/{expediente_id}/parte_{parte_id}.pdf
  */
 
+/**
+ * ESTADO: STUB — NO OPERATIVO EN PRODUCCIÓN
+ *
+ * Este pipeline crea el registro del documento en la tabla `documentos`
+ * con estado 'pendiente', pero NO genera ningún archivo PDF.
+ * El campo `_stub: true` de la respuesta señala este estado a los consumidores.
+ *
+ * El PDF real requiere un worker procesador (Cloudflare Queue o Supabase Edge Function)
+ * que está pendiente de implementación en P3.1 del plan de remediación.
+ *
+ * Impacto en demo: mostrar al usuario el banner "PDF pendiente" en lugar
+ * de un link de descarga. Ver PartesValidacionPage.tsx.
+ */
 export async function enqueuePartePdf(
   supabase: SupabaseClient,
   params: {
@@ -23,7 +36,7 @@ export async function enqueuePartePdf(
     actor_id: string;
     numero_expediente: string;
   }
-): Promise<{ documento_id: string | null; error: string | null }> {
+): Promise<{ documento_id: string | null; error: string | null; _stub: true }> {
   const storagePath = `documentos/${params.expediente_id}/parte_${params.parte_id}.pdf`;
   const nombre = `Parte_${params.numero_expediente}_${new Date().toISOString().split('T')[0]}.pdf`;
 
@@ -43,7 +56,7 @@ export async function enqueuePartePdf(
     .single();
 
   if (error) {
-    return { documento_id: null, error: error.message };
+    return { documento_id: null, error: error.message, _stub: true };
   }
 
   await Promise.all([
@@ -67,7 +80,7 @@ export async function enqueuePartePdf(
     }),
   ]);
 
-  return { documento_id: data.id, error: null };
+  return { documento_id: data.id, error: null, _stub: true };
 }
 
 /**

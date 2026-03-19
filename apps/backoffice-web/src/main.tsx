@@ -5,7 +5,20 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/lib/auth-context';
 import { App } from '@/App';
 import { CustomerTrackingPage } from '@/pages/CustomerTrackingPage';
+// 1. Tokens (primitivos + semánticos light/dark) — debe ir primero
+import '@/styles/tokens.css';
+// 2. Estilos globales, layout y clases de compatibilidad
 import '@/styles/global.css';
+// 3. Componentes v2
+import '@/styles/components/sidebar.css';
+import '@/styles/components/badge.css';
+import '@/styles/components/button.css';
+import '@/styles/components/table.css';
+import '@/styles/components/form.css';
+import '@/styles/components/modal.css';
+import '@/styles/components/alert.css';
+import '@/styles/components/timeline.css';
+import '@/styles/components/card.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { IntakeClaimRequest, IntakeClaimResponse } from '@erp/types';
 import { getRequestIp } from '../http/request-metadata';
 import { createExpedienteCommand, normalizeCommandError } from '../services/core-commands';
+import { validate, validationError } from '../validation/schema';
 import type { Env } from '../types';
 
 export const intakeRoutes = new Hono<{ Bindings: Env }>();
@@ -12,26 +13,36 @@ intakeRoutes.post('/claims', async (c) => {
   const user = c.get('user');
   const body = await c.req.json<IntakeClaimRequest>();
 
-  const errors: string[] = [];
-  if (!body.referencia_externa) errors.push('referencia_externa requerida');
-  if (!body.compania_codigo) errors.push('compania_codigo requerido');
-  if (!body.tipo_siniestro) errors.push('tipo_siniestro requerido');
-  if (!body.descripcion) errors.push('descripcion requerida');
-  if (!body.direccion_siniestro) errors.push('direccion_siniestro requerida');
-  if (!body.codigo_postal) errors.push('codigo_postal requerido');
-  if (!body.localidad) errors.push('localidad requerida');
-  if (!body.provincia) errors.push('provincia requerida');
-  if (!body.asegurado?.nombre) errors.push('asegurado.nombre requerido');
-  if (!body.asegurado?.apellidos) errors.push('asegurado.apellidos requerido');
-  if (!body.asegurado?.telefono) errors.push('asegurado.telefono requerido');
-  if (!body.asegurado?.direccion) errors.push('asegurado.direccion requerida');
-  if (!body.asegurado?.codigo_postal) errors.push('asegurado.codigo_postal requerido');
-  if (!body.asegurado?.localidad) errors.push('asegurado.localidad requerida');
-  if (!body.asegurado?.provincia) errors.push('asegurado.provincia requerida');
+  // Validación declarativa del payload raíz
+  const rootCheck = validate(body, {
+    referencia_externa: { required: true, minLength: 1, maxLength: 100 },
+    compania_codigo:    { required: true, minLength: 1, maxLength: 20 },
+    tipo_siniestro:     { required: true, minLength: 1, maxLength: 60 },
+    descripcion:        { required: true, minLength: 1, maxLength: 2000 },
+    direccion_siniestro:{ required: true, minLength: 1, maxLength: 300 },
+    codigo_postal:      { required: true, minLength: 5, maxLength: 10 },
+    localidad:          { required: true, minLength: 1, maxLength: 100 },
+    provincia:          { required: true, minLength: 1, maxLength: 100 },
+  });
+  if (!rootCheck.ok) return validationError(c, rootCheck.errors);
 
-  if (errors.length > 0) {
-    const resp: IntakeClaimResponse = { status: 'validation_error', errors };
-    return c.json({ data: resp, error: null }, 422);
+  // Validación del sub-objeto asegurado
+  const aseguradoCheck = validate(body.asegurado as Record<string, unknown> ?? {}, {
+    nombre:       { required: true, minLength: 1, maxLength: 200 },
+    apellidos:    { required: true, minLength: 1, maxLength: 200 },
+    telefono:     { required: true, minLength: 9, maxLength: 20 },
+    direccion:    { required: true, minLength: 1, maxLength: 300 },
+    codigo_postal:{ required: true, minLength: 5, maxLength: 10 },
+    localidad:    { required: true, minLength: 1, maxLength: 100 },
+    provincia:    { required: true, minLength: 1, maxLength: 100 },
+    email:        { isEmail: true },
+  });
+  if (!aseguradoCheck.ok) {
+    const prefixed: Record<string, string[]> = {};
+    for (const [k, v] of Object.entries(aseguradoCheck.errors)) {
+      prefixed[`asegurado.${k}`] = v;
+    }
+    return validationError(c, prefixed);
   }
 
   const { data: dupRef } = await supabase

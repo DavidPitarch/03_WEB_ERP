@@ -2,10 +2,11 @@ name = "erp-siniestros-api"
 main = "src/index.ts"
 compatibility_date = "2024-06-01"
 
+# ─── Entorno de desarrollo (por defecto) ────────────────────────────────────
 [vars]
 ENVIRONMENT = "development"
 
-# Queues (descomentar cuando se configuren)
+# Queues (descomentar cuando se activen en P3.1 — PDF pipeline real)
 # [[queues.producers]]
 # queue = "domain-events"
 # binding = "DOMAIN_EVENTS_QUEUE"
@@ -16,6 +17,29 @@ ENVIRONMENT = "development"
 # max_retries = 3
 # dead_letter_queue = "domain-events-dlq"
 
-# Cron Triggers (watchdogs)
+# Cron Triggers (watchdogs) — 7:00 y 13:00 UTC
 [triggers]
+crons = ["0 7 * * *", "0 13 * * *"]
+
+
+# ─── Entorno de producción ───────────────────────────────────────────────────
+# Deploy: wrangler deploy --env production
+#
+# Secrets requeridos (cargar con `wrangler secret put <NAME> --env production`):
+#   SUPABASE_URL                — URL del proyecto Supabase de producción
+#   SUPABASE_ANON_KEY           — Clave anónima de Supabase
+#   SUPABASE_SERVICE_ROLE_KEY   — Clave de service role (nunca en este fichero)
+#   RESEND_API_KEY              — API key de Resend para email real
+#   VP_WEBHOOK_SECRET           — Secret HMAC para verificar webhooks VP
+#   CONFIRM_BASE_URL            — URL base del portal de confirmación/tracking
+#   ALLOWED_ORIGINS             — Orígenes CORS en producción (comma-separated)
+#
+# Sin estos secrets, el health check devolverá 207 degraded.
+[env.production]
+name = "erp-siniestros-api"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+
+[env.production.triggers]
 crons = ["0 7 * * *", "0 13 * * *"]

@@ -23,5 +23,7 @@ declare module 'hono' {
     supabase: import('@supabase/supabase-js').SupabaseClient;
     adminSupabase: import('@supabase/supabase-js').SupabaseClient;
     userSupabase: import('@supabase/supabase-js').SupabaseClient;
+    /** UUID generado (o propagado) por requestLoggerMiddleware. Presente en todos los requests. */
+    correlationId: string;
   }
 }

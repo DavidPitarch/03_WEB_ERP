@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { insertAudit, insertDomainEvent } from '../services/audit';
 import { sendFacturaEmail } from '../services/email-sender';
+import { validate, validationError } from '../validation/schema';
 export const facturasRoutes = new Hono();
 // ─── Helper ────────────────────────────────────────────────────────────────
 function err(code, message) {
@@ -201,9 +202,16 @@ facturasRoutes.post('/emitir', async (c) => {
     const supabase = c.get('supabase');
     const user = c.get('user');
     const body = await c.req.json();
-    if (!body.expediente_id || !body.serie_id) {
-        return c.json(err('VALIDATION', 'expediente_id y serie_id requeridos'), 422);
-    }
+    const fCheck = validate(body, {
+        expediente_id: { required: true, isUuid: true },
+        serie_id: { required: true, isUuid: true },
+        presupuesto_id: { isUuid: true },
+        forma_pago: { maxLength: 60 },
+        iva_porcentaje: { isNumber: true, isPositive: true },
+        notas: { maxLength: 1000 },
+    });
+    if (!fCheck.ok)
+        return validationError(c, fCheck.errors);
     // V1: Expediente must be FINALIZADO
     const { data: expediente } = await supabase
         .from('expedientes')

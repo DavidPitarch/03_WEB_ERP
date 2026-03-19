@@ -15,8 +15,24 @@ export async function runScheduledTasks(env) {
     return results;
 }
 export async function scheduled(_event, env, _ctx) {
-    const results = await runScheduledTasks(env);
-    console.log('[SCHEDULED]', new Date().toISOString(), results);
+    const correlation_id = crypto.randomUUID();
+    const ts = new Date().toISOString();
+    console.log(JSON.stringify({ level: 'info', job: 'scheduled', phase: 'start', correlation_id, ts }));
+    try {
+        const results = await runScheduledTasks(env);
+        console.log(JSON.stringify({ level: 'info', job: 'scheduled', phase: 'complete', correlation_id, results, ts: new Date().toISOString() }));
+    }
+    catch (err) {
+        console.error(JSON.stringify({
+            level: 'error',
+            job: 'scheduled',
+            phase: 'failed',
+            correlation_id,
+            error: err instanceof Error ? err.message : String(err),
+            stack: err instanceof Error ? err.stack : undefined,
+            ts: new Date().toISOString(),
+        }));
+    }
 }
 async function generateAlertsManual(supabase) {
     const now = new Date().toISOString();
@@ -64,9 +80,10 @@ async function generateAlertsManual(supabase) {
 }
 async function detectPedidosCaducados(supabase) {
     const now = new Date().toISOString();
+    // Select 'estado' so historial reflects the actual pre-caducado state
     const { data } = await supabase
         .from('pedidos_material')
-        .select('id')
+        .select('id, estado')
         .in('estado', ['pendiente', 'enviado'])
         .lt('fecha_limite', now);
     let count = 0;
@@ -77,7 +94,7 @@ async function detectPedidosCaducados(supabase) {
         }).eq('id', p.id);
         await supabase.from('historial_pedido').insert({
             pedido_id: p.id,
-            estado_anterior: 'enviado',
+            estado_anterior: p.estado, // use actual state, not hardcoded 'enviado'
             estado_nuevo: 'caducado',
             motivo: 'Fecha limite superada (cron)',
         });

@@ -1,67 +1,55 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
-import { useAuth } from '@/lib/auth-context';
+import { useState } from 'react';
+import { Outlet, Link } from 'react-router-dom';
+import { Menu, X } from 'lucide-react';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { AlertBanner } from '@/components/AlertBanner';
-import { useAlertasCount } from '@/hooks/useAlertas';
-
-const NAV_ITEMS = [
-  { path: '/expedientes', label: 'Expedientes' },
-  { path: '/tareas', label: 'Tareas' },
-  { path: '/partes-validacion', label: 'Validar partes' },
-  { path: '/baremos', label: 'Baremos' },
-  { path: '/informes-caducados', label: 'Inf. caducados' },
-  { path: '/pendientes-facturar', label: 'Pend. facturar' },
-  { path: '/facturas', label: 'Facturas' },
-  { path: '/facturas-caducadas', label: 'Fact. caducadas' },
-  { path: '/proveedores', label: 'Proveedores' },
-  { path: '/pedidos', label: 'Pedidos' },
-  { path: '/pedidos/a-recoger', label: 'A recoger' },
-  { path: '/pedidos/caducados', label: 'Ped. caducados' },
-  { path: '/dashboard', label: 'Dashboard' },
-  { path: '/rentabilidad', label: 'Rentabilidad' },
-  { path: '/reporting-facturas', label: 'Reporting' },
-  { path: '/autofacturas', label: 'Autofacturas' },
-  { path: '/peritos/expedientes', label: 'Mis expedientes' },
-  { path: '/peritos/dictamenes', label: 'Dictámenes' },
-  { path: '/peritos/admin', label: 'Peritos' },
-  { path: '/videoperitaciones', label: 'Videoperitaciones' },
-  { path: '/videoperitaciones/pendientes', label: 'VP Pendientes' },
-  { path: '/videoperitaciones/agenda', label: 'VP Agenda' },
-  { path: '/maestros', label: 'Maestros' },
-];
+import { AppSidebar } from '@/components/AppSidebar';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { useTheme } from '@/hooks/useTheme';
 
 export function AppLayout() {
-  const { user, signOut } = useAuth();
-  const location = useLocation();
-  const { data: countRes } = useAlertasCount();
-  const alertCount = countRes && 'data' in countRes ? countRes.data?.count ?? 0 : 0;
+  // Inicializa el hook de tema para que quede activo en toda la app
+  useTheme();
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="app-layout">
+      {/* ── HEADER ── */}
       <header className="app-header">
         <div className="header-left">
-          <Link to="/" className="logo">ERP Siniestros</Link>
-          <nav className="main-nav">
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`nav-link ${location.pathname.startsWith(item.path) ? 'active' : ''}`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          {/* Hamburguesa — solo visible en móvil/tablet */}
+          <button
+            className="sidebar-toggle-btn"
+            onClick={() => setSidebarOpen(prev => !prev)}
+            aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
+            type="button"
+          >
+            {sidebarOpen ? <X size={16} /> : <Menu size={16} />}
+          </button>
+
+          <Link to="/expedientes" className="logo">ERP Siniestros</Link>
         </div>
+
+        {/* Buscador global — ocupa el espacio central */}
         <GlobalSearch />
+
+        {/* Acciones del header */}
         <div className="header-right">
-          {alertCount > 0 && <span className="alert-count-badge">{alertCount}</span>}
-          <span className="user-email">{user?.email}</span>
-          <button onClick={signOut} className="btn-logout">Salir</button>
+          <ThemeToggle />
         </div>
       </header>
-      <AlertBanner />
+
+      {/* ── SIDEBAR ── */}
+      <AppSidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
+
+      {/* ── CONTENIDO PRINCIPAL ── */}
       <main className="app-main">
+        {/* Banner de alertas — se muestra dentro del área de contenido */}
+        <AlertBanner />
         <Outlet />
       </main>
     </div>

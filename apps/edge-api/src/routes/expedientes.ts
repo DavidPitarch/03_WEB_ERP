@@ -6,6 +6,7 @@ import {
   normalizeCommandError,
   transitionExpedienteCommand,
 } from '../services/core-commands';
+import { validate, validationError } from '../validation/schema';
 import type { Env } from '../types';
 
 export const expedientesRoutes = new Hono<{ Bindings: Env }>();
@@ -78,20 +79,37 @@ expedientesRoutes.post('/', async (c) => {
   const user = c.get('user');
   const body = await c.req.json<CreateExpedienteRequest>();
 
-  const required = ['compania_id', 'empresa_facturadora_id', 'tipo_siniestro', 'descripcion', 'direccion_siniestro', 'codigo_postal', 'localidad', 'provincia'];
-  const missing = required.filter((field) => !body[field as keyof typeof body]);
-  if (missing.length > 0) {
-    return c.json({ data: null, error: { code: 'VALIDATION', message: `Campos requeridos: ${missing.join(', ')}` } }, 422);
-  }
+  const check = validate(body, {
+    compania_id:            { required: true, isUuid: true },
+    empresa_facturadora_id: { required: true, isUuid: true },
+    tipo_siniestro:         { required: true, minLength: 1, maxLength: 60 },
+    descripcion:            { required: true, minLength: 1, maxLength: 2000 },
+    direccion_siniestro:    { required: true, minLength: 1, maxLength: 300 },
+    codigo_postal:          { required: true, minLength: 5, maxLength: 10 },
+    localidad:              { required: true, minLength: 1, maxLength: 100 },
+    provincia:              { required: true, minLength: 1, maxLength: 100 },
+    asegurado_id:           { isUuid: true },
+  });
+  if (!check.ok) return validationError(c, check.errors);
 
   if (!body.asegurado_id && !body.asegurado_nuevo) {
-    return c.json({ data: null, error: { code: 'VALIDATION', message: 'Debe indicar asegurado_id o asegurado_nuevo' } }, 422);
+    return validationError(c, { asegurado: ['Debe indicar asegurado_id o asegurado_nuevo'] });
   }
 
   if (body.asegurado_nuevo) {
-    const asegurado = body.asegurado_nuevo;
-    if (!asegurado.nombre || !asegurado.apellidos || !asegurado.telefono || !asegurado.direccion || !asegurado.codigo_postal || !asegurado.localidad || !asegurado.provincia) {
-      return c.json({ data: null, error: { code: 'VALIDATION', message: 'Datos del asegurado incompletos' } }, 422);
+    const aCheck = validate(body.asegurado_nuevo as Record<string, unknown>, {
+      nombre:        { required: true, minLength: 1, maxLength: 200 },
+      apellidos:     { required: true, minLength: 1, maxLength: 200 },
+      telefono:      { required: true, minLength: 9, maxLength: 20 },
+      direccion:     { required: true, minLength: 1, maxLength: 300 },
+      codigo_postal: { required: true, minLength: 5, maxLength: 10 },
+      localidad:     { required: true, minLength: 1, maxLength: 100 },
+      provincia:     { required: true, minLength: 1, maxLength: 100 },
+    });
+    if (!aCheck.ok) {
+      const prefixed: Record<string, string[]> = {};
+      for (const [k, v] of Object.entries(aCheck.errors)) prefixed[`asegurado_nuevo.${k}`] = v;
+      return validationError(c, prefixed);
     }
   }
 
@@ -132,9 +150,13 @@ expedientesRoutes.post('/:id/transicion', async (c) => {
     causa_pendiente_detalle?: string;
   }>();
 
-  if (!estado_nuevo) {
-    return c.json({ data: null, error: { code: 'VALIDATION', message: 'estado_nuevo es requerido' } }, 422);
-  }
+  const tCheck = validate({ estado_nuevo, motivo, causa_pendiente, causa_pendiente_detalle }, {
+    estado_nuevo:              { required: true, minLength: 1 },
+    motivo:                    { maxLength: 500 },
+    causa_pendiente:           { maxLength: 100 },
+    causa_pendiente_detalle:   { maxLength: 1000 },
+  });
+  if (!tCheck.ok) return validationError(c, tCheck.errors);
 
   try {
     const data = await transitionExpedienteCommand(

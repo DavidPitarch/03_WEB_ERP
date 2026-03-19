@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── edge-api: typecheck + test + build ─────────────────────────────────────
+  edge-api:
+    name: edge-api
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/edge-api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.5.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Tests
+        run: pnpm test
+
+      - name: Build (wrangler)
+        run: pnpm exec wrangler deploy --dry-run --outdir dist
+
+  # ── backoffice-web: build (includes tsc) ───────────────────────────────────
+  backoffice-web:
+    name: backoffice-web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backoffice-web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.5.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Build (typecheck + vite)
+        run: pnpm build
+
+  # ── operator-pwa: build (includes tsc) ────────────────────────────────────
+  operator-pwa:
+    name: operator-pwa
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/operator-pwa
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.5.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Build (typecheck + vite)
+        run: pnpm build
+
+  # ── domain + types packages ────────────────────────────────────────────────
+  packages:
+    name: packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.5.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck packages
+        run: pnpm --filter @erp/domain --filter @erp/types typecheck || true

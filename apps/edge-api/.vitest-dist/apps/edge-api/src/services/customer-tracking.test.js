@@ -33,6 +33,34 @@ describe('customer tracking token validation', () => {
         expect(result.ok).toBe(false);
         expect(result.code).toBe('TOKEN_INVALIDO');
     });
+    it('rejects a revoked token', () => {
+        const result = validateCustomerTrackingToken({
+            id: 'tok-1',
+            expediente_id: 'exp-1',
+            token_hash: 'hash',
+            expires_at: '2026-03-19T12:00:00.000Z',
+            max_uses: 5,
+            use_count: 1,
+            revoked_at: '2026-03-18T09:00:00.000Z',
+        }, now);
+        expect(result.ok).toBe(false);
+        expect(result.code).toBe('TOKEN_REVOCADO');
+        expect(result.status).toBe(410);
+    });
+    it('rejects an exhausted token', () => {
+        const result = validateCustomerTrackingToken({
+            id: 'tok-1',
+            expediente_id: 'exp-1',
+            token_hash: 'hash',
+            expires_at: '2026-03-19T12:00:00.000Z',
+            max_uses: 5,
+            use_count: 5,
+            revoked_at: null,
+        }, now);
+        expect(result.ok).toBe(false);
+        expect(result.code).toBe('TOKEN_AGOTADO');
+        expect(result.status).toBe(422);
+    });
 });
 describe('customer tracking cita actions', () => {
     const now = new Date('2026-03-18T12:00:00.000Z');

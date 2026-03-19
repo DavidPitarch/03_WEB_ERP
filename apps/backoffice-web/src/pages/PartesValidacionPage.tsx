@@ -8,11 +8,16 @@ export function PartesValidacionPage() {
   const rechazar = useRechazarParte();
   const [motivoRechazo, setMotivoRechazo] = useState<Record<string, string>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // IDs de partes recién validados — muestran el aviso de PDF pendiente
+  const [pdfPendingIds, setPdfPendingIds] = useState<Set<string>>(new Set());
 
   const items = res && 'data' in res ? (res.data ?? []) as any[] : [];
 
   async function handleValidar(id: string) {
     await validar.mutateAsync(id);
+    // El PDF se encola pero no se genera en este momento (stub activo).
+    // Marcar este parte para mostrar el aviso informativo.
+    setPdfPendingIds((prev) => new Set([...prev, id]));
     refetch();
   }
 
@@ -29,6 +34,28 @@ export function PartesValidacionPage() {
     <div className="page-partes-validacion">
       <h2>Partes pendientes de validación</h2>
       <p className="text-muted">Partes enviados por operarios que requieren revisión técnica.</p>
+
+      {/* ── Aviso de PDF pendiente — stub activo hasta P3.1 ────────────── */}
+      <div style={{
+        background: '#fff8e1',
+        border: '1px solid #f59e0b',
+        borderRadius: 6,
+        padding: '10px 14px',
+        marginBottom: 16,
+        fontSize: 13,
+        color: '#92400e',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 8,
+      }}>
+        <span style={{ flexShrink: 0, fontWeight: 700 }}>⚠</span>
+        <span>
+          <strong>Generación de PDF pendiente de activación.</strong>{' '}
+          Al validar un parte, el sistema registra el documento pero <strong>no genera el PDF todavía</strong>.
+          Los partes validados quedan en estado <em>pendiente</em> hasta que el procesador de documentos esté activo.
+          No hay enlace de descarga disponible en esta fase.
+        </span>
+      </div>
 
       {isLoading ? (
         <div className="loading">Cargando...</div>
@@ -67,6 +94,13 @@ export function PartesValidacionPage() {
                   )}
                 </div>
               </div>
+
+              {/* Indicador por parte — visible tras validar en esta sesión */}
+              {pdfPendingIds.has(parte.id) && (
+                <div style={{ fontSize: 12, color: '#92400e', background: '#fff3cd', padding: '4px 8px', borderRadius: 4, marginBottom: 6 }}>
+                  ⚠ PDF en cola — pendiente de procesador. Sin enlace de descarga disponible.
+                </div>
+              )}
 
               <div className="parte-card-actions">
                 <button

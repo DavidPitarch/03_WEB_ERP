@@ -24,6 +24,7 @@ import { peritosRoutes } from './routes/peritos';
 import { videoperitacionesRoutes } from './routes/videoperitaciones';
 import { vpWebhooksRoutes } from './routes/vp-webhooks';
 import { internalRoutes } from './routes/internal';
+import { customerTrackingAdminRoutes, customerTrackingPublicRoutes } from './routes/customer-tracking';
 import { authMiddleware } from './middleware/auth';
 import { requireRoles } from './middleware/roles';
 import { OFFICE_ROLES, OPERATOR_ROLES, PERITO_ROUTE_ROLES, VIDEOPERITACION_ROLES } from './security/role-groups';
@@ -98,6 +99,9 @@ app.post('/api/v1/public/pedidos/:id/confirmar', rateLimit(20, 60_000), async (c
 
 // Public VP webhook endpoint — rate limited, no auth
 app.route('/api/v1/public/videoperitacion/webhooks', vpWebhooksRoutes);
+app.use('/api/v1/public/customer-tracking', rateLimit(30, 60_000));
+app.use('/api/v1/public/customer-tracking/*', rateLimit(30, 60_000));
+app.route('/api/v1/public/customer-tracking', customerTrackingPublicRoutes);
 
 // Protected routes
 const api = new Hono<{ Bindings: Env }>();
@@ -129,6 +133,7 @@ protectRouteGroup('/operator', requireRoles(OPERATOR_ROLES));
 protectRouteGroup('/peritos', requireRoles(PERITO_ROUTE_ROLES));
 protectRouteGroup('/videoperitaciones', requireRoles(VIDEOPERITACION_ROLES));
 protectRouteGroup('/internal', requireRoles(['admin']));
+protectRouteGroup('/customer-tracking-links', requireRoles(OFFICE_ROLES));
 api.use('/facturas/:id/registrar-cobro', requireRoles(['admin', 'financiero']));
 api.use('/facturas/:id/registrar-cobro/*', requireRoles(['admin', 'financiero']));
 api.route('/expedientes', expedientesRoutes);
@@ -152,6 +157,7 @@ api.route('/autofacturas', autofacturasRoutes);
 api.route('/peritos', peritosRoutes);
 api.route('/videoperitaciones', videoperitacionesRoutes);
 api.route('/internal', internalRoutes);
+api.route('/customer-tracking-links', customerTrackingAdminRoutes);
 
 app.route('/api/v1', api);
 

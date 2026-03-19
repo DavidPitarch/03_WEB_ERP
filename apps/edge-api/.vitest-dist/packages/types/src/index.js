@@ -43,6 +43,7 @@ export const DOMAIN_EVENT_TYPES = [
     'PagoRegistrado',
     'TareaDisparada',
     'ClienteConfirmaCita',
+    'ClienteSolicitaCambioCita',
     'PedidoEnviado',
     'PedidoCaducado',
     'PedidoRecogido',

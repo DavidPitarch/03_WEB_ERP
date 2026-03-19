@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import type { CustomerTrackingIssueLinkResponse } from '@erp/types';
 import { useExpediente, useExpedienteTimeline, useExpedientePartes, useTransicionEstado } from '@/hooks/useExpedientes';
 import { useRealtimeExpediente } from '@/hooks/useRealtime';
 import { NuevaCitaModal } from '@/components/NuevaCitaModal';
@@ -43,6 +44,8 @@ export function ExpedienteDetailPage() {
   const [showCitaModal, setShowCitaModal] = useState(false);
   const [showPedidoModal, setShowPedidoModal] = useState(false);
   const [timelineFilter, setTimelineFilter] = useState<string>('all');
+  const [trackingLink, setTrackingLink] = useState<string | null>(null);
+  const [trackingExpiry, setTrackingExpiry] = useState<string | null>(null);
 
   // Pedidos de material del expediente
   const { data: pedidosResult } = useQuery({
@@ -65,6 +68,16 @@ export function ExpedienteDetailPage() {
     onSuccess: () => {
       setNota('');
       qc.invalidateQueries({ queryKey: ['expediente-timeline', id] });
+    },
+  });
+
+  const customerLinkMut = useMutation({
+    mutationFn: () => api.post<CustomerTrackingIssueLinkResponse>('/customer-tracking-links', { expediente_id: id }),
+    onSuccess: (result) => {
+      if ('data' in result && result.data) {
+        setTrackingLink(`${window.location.origin}${result.data.path}`);
+        setTrackingExpiry(result.data.expires_at);
+      }
     },
   });
 
@@ -161,6 +174,31 @@ export function ExpedienteDetailPage() {
           )}
         </section>
       </div>
+
+      <section className="detail-section">
+        <div className="customer-link-panel">
+          <div>
+            <h3>Portal cliente</h3>
+            <p className="text-muted">Emite un magic link temporal para el tracking B2C del expediente.</p>
+          </div>
+          <div className="customer-link-actions">
+            <button className="btn-secondary" onClick={() => customerLinkMut.mutate()} disabled={customerLinkMut.isPending}>
+              {customerLinkMut.isPending ? 'Generando enlace...' : 'Generar enlace cliente'}
+            </button>
+            {trackingLink && (
+              <button className="btn-primary" onClick={() => navigator.clipboard.writeText(trackingLink)}>
+                Copiar enlace
+              </button>
+            )}
+          </div>
+        </div>
+        {trackingLink && (
+          <div className="customer-link-result">
+            <input readOnly value={trackingLink} />
+            {trackingExpiry && <p className="text-muted">Caduca el {new Date(trackingExpiry).toLocaleString('es-ES')}</p>}
+          </div>
+        )}
+      </section>
 
       {/* Partes de operario */}
       {partes.length > 0 && (

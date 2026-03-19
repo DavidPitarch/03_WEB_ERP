@@ -207,6 +207,7 @@ export const DOMAIN_EVENT_TYPES = [
   'PagoRegistrado',
   'TareaDisparada',
   'ClienteConfirmaCita',
+  'ClienteSolicitaCambioCita',
   'PedidoEnviado',
   'PedidoCaducado',
   'PedidoRecogido',
@@ -1417,4 +1418,83 @@ export interface VpEnvio {
   metadata: Record<string, any>;
   created_at: string;
   updated_at: string;
+}
+
+// EP-12: Customer tracking
+
+export interface CustomerTrackingIssueLinkRequest {
+  expediente_id: string;
+  ttl_hours?: number;
+  max_uses?: number;
+}
+
+export interface CustomerTrackingIssueLinkResponse {
+  expediente_id: string;
+  token: string;
+  path: string;
+  expires_at: string;
+  revoked_previous_count: number;
+}
+
+export interface CustomerTrackingConfirmCitaResponse {
+  cita_id: string;
+  estado: string;
+  customer_confirmed_at: string;
+}
+
+export interface CustomerTrackingSolicitarCambioRequest {
+  franja_solicitada: string;
+  motivo: string;
+}
+
+export interface CustomerTrackingSolicitarCambioResponse {
+  cita_id: string;
+  estado: string;
+  customer_reschedule_requested_at: string;
+  customer_reschedule_status: string;
+}
+
+export interface CustomerTrackingTimelineItem {
+  id: string;
+  type: 'estado' | 'cita' | 'accion_cliente';
+  title: string;
+  detail: string | null;
+  created_at: string;
+}
+
+export interface CustomerTrackingContact {
+  label: string;
+  telefono: string | null;
+  email: string | null;
+}
+
+export interface CustomerTrackingView {
+  expediente: {
+    id: string;
+    numero_expediente: string;
+    estado: string;
+    estado_label: string;
+    estado_resumen: string;
+    tipo_siniestro: string;
+    updated_at: string;
+  };
+  cita: {
+    id: string;
+    fecha: string;
+    franja_inicio: string;
+    franja_fin: string;
+    estado: string;
+    estado_label: string;
+    tecnico: {
+      identificacion: string | null;
+    } | null;
+    customer_confirmed_at: string | null;
+    customer_reschedule_requested_at: string | null;
+    customer_reschedule_requested_slot: string | null;
+    customer_reschedule_status: string | null;
+    can_confirm: boolean;
+    can_request_change: boolean;
+  } | null;
+  contacto: CustomerTrackingContact | null;
+  timeline: CustomerTrackingTimelineItem[];
 }

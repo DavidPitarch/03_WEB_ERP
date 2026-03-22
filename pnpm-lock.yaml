@@ -137,6 +137,9 @@ importers:
       vite-plugin-pwa:
         specifier: ^0.20.0
         version: 0.20.5(vite@5.4.21(@types/node@25.5.0)(terser@5.46.0))(workbox-build@7.4.0(@types/babel__core@7.20.5))(workbox-window@7.4.0)
+      wrangler:
+        specifier: ^3.60.0
+        version: 3.114.17(@cloudflare/workers-types@4.20260313.1)
 
   packages/domain:
     dependencies:

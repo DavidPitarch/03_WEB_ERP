@@ -51,6 +51,7 @@
   /* ─── DIMENSIONES GLOBALES ─── */
   --sidebar-width:       240px;
   --header-height:       56px;
+  --cockpit-bar-h:       36px;
   --content-max-width:   1440px;
   --content-padding:     1.5rem;
 

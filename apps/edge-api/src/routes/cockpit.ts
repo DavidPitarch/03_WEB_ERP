@@ -23,6 +23,8 @@ interface CockpitItem {
   estado?: string;
   etiqueta?: string;
   fecha?: string;
+  asegurado_nombre?: string;
+  direccion_completa?: string;
   detailPath: string;
 }
 
@@ -42,7 +44,7 @@ cockpitRoutes.get('/feed', async (c) => {
   const supabase = c.get('supabase');
 
   // ── 1. ASIGNACIONES ──────────────────────────────────────────────────────
-  // Expedientes en estado NO_ASIGNADO o EN_PLANIFICACION
+  // Expedientes recién llegados: NUEVO y NO_ASIGNADO (sin tramitar aún)
   const { data: expsAsign, error: e1 } = await supabase
     .from('expedientes')
     .select(`
@@ -55,7 +57,7 @@ cockpitRoutes.get('/feed', async (c) => {
       fecha_encargo,
       compania:companias(nombre)
     `)
-    .in('estado', ['NO_ASIGNADO', 'EN_PLANIFICACION'])
+    .in('estado', ['NUEVO', 'NO_ASIGNADO'])
     .order('prioridad', { ascending: false })
     .order('fecha_encargo', { ascending: true })
     .limit(10);
@@ -64,7 +66,7 @@ cockpitRoutes.get('/feed', async (c) => {
   const { count: totalAsign } = await supabase
     .from('expedientes')
     .select('id', { count: 'exact', head: true })
-    .in('estado', ['NO_ASIGNADO', 'EN_PLANIFICACION']);
+    .in('estado', ['NUEVO', 'NO_ASIGNADO']);
 
   const asignItems: CockpitItem[] = (expsAsign ?? []).map((e: any) => ({
     id:         e.id,
@@ -84,10 +86,19 @@ cockpitRoutes.get('/feed', async (c) => {
   };
 
   // ── 2. SOLICITUDES / AVISOS ───────────────────────────────────────────────
-  // Alertas activas del sistema
+  // Alertas activas + datos del asegurado para el tooltip
   const { data: alertasData } = await supabase
     .from('alertas')
-    .select('id, tipo, expediente_id, mensaje, prioridad, created_at, expediente:expedientes(numero_expediente)')
+    .select(`
+      id, tipo, expediente_id, mensaje, prioridad, created_at,
+      expediente:expedientes(
+        numero_expediente,
+        direccion_siniestro,
+        codigo_postal,
+        localidad,
+        asegurado:asegurados(nombre, apellidos)
+      )
+    `)
     .eq('estado', 'activa')
     .order('prioridad', { ascending: false })
     .order('created_at', { ascending: true })
@@ -98,15 +109,22 @@ cockpitRoutes.get('/feed', async (c) => {
     .select('id', { count: 'exact', head: true })
     .eq('estado', 'activa');
 
-  const solicItems: CockpitItem[] = (alertasData ?? []).map((a: any) => ({
-    id:         a.id,
-    numero:     a.expediente?.numero_expediente ?? `AVISO-${a.id.slice(0, 6)}`,
-    tipo:       a.tipo,
-    etiqueta:   a.prioridad ?? 'pendiente',
-    prioridad:  a.prioridad,
-    fecha:      a.created_at,
-    detailPath: a.expediente_id ? `/expedientes/${a.expediente_id}` : '/solicitudes',
-  }));
+  const solicItems: CockpitItem[] = (alertasData ?? []).map((a: any) => {
+    const exp = a.expediente;
+    const aseg = exp?.asegurado;
+    const partesDireccion = [exp?.direccion_siniestro, exp?.codigo_postal, exp?.localidad].filter(Boolean);
+    return {
+      id:                a.id,
+      numero:            exp?.numero_expediente ?? `AVISO-${a.id.slice(0, 6)}`,
+      tipo:              a.tipo,
+      etiqueta:          a.prioridad ?? 'pendiente',
+      prioridad:         a.prioridad,
+      fecha:             a.created_at,
+      detailPath:        a.expediente_id ? `/expedientes/${a.expediente_id}` : '/solicitudes',
+      asegurado_nombre:  aseg ? `${aseg.nombre} ${aseg.apellidos}`.trim() : undefined,
+      direccion_completa: partesDireccion.length ? partesDireccion.join(', ') : undefined,
+    };
+  });
 
   const solicitudes: ModuleData = {
     total:    totalAlertas ?? solicItems.length,

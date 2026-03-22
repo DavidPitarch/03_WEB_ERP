@@ -113,6 +113,9 @@ export interface CockpitFeedItem {
   estado?: string;
   etiqueta?: string;      // texto libre de estado de negocio
   fecha?: string;
+  /** Para el tooltip de Solicitudes/Avisos */
+  asegurado_nombre?: string;
+  direccion_completa?: string;
   /** Ruta directa al detalle (deep link al expediente) */
   detailPath: string;
 }

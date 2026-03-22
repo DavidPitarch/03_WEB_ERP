@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@9.5.0",
+  "devDependencies": {
+    "supabase": "^2.0.0"
+  },
   "scripts": {
     "dev:api": "pnpm --filter @erp/edge-api dev",
     "dev:web": "pnpm --filter @erp/backoffice-web dev",

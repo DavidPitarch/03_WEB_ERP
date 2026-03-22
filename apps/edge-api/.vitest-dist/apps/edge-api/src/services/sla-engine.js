@@ -1,3 +1,4 @@
+import { getFestivosParaSla } from './calendario';
 // ─── Constants ──────────────────────────────────────────────────────
 const MS_PER_BUSINESS_HOUR = 60 * 60 * 1000;
 const BUSINESS_HOURS_PER_DAY = 8;
@@ -94,8 +95,8 @@ export async function calculateSlaStatus(supabase, expedienteId) {
             duracion_ms: fin.getTime() - inicio.getTime(),
         };
     });
-    // 3. Fetch calendario laboral (festivos)
-    const festivos = await getCalendarioLaboral(supabase, toDateStr(fechaEncargo), toDateStr(fechaFin));
+    // 3. Fetch festivos (calendario_laboral + cal_festivos multi-ámbito)
+    const festivos = await getFestivosParaSla(supabase, toDateStr(fechaEncargo), toDateStr(fechaFin));
     const festivoSet = new Set(festivos);
     // 4. Calculate times
     const tiempoTotalMs = fechaFin.getTime() - fechaEncargo.getTime();

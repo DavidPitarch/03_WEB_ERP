@@ -22,6 +22,29 @@ ENVIRONMENT = "development"
 crons = ["0 7 * * *", "0 13 * * *"]
 
 
+# ─── Entorno demo ─────────────────────────────────────────────────────────────
+# Deploy: wrangler deploy --env demo
+# URL pública: https://erp-siniestros-api-demo.<account>.workers.dev
+#
+# Secrets (cargar con `wrangler secret put <NAME> --env demo`):
+#   SUPABASE_URL               — URL Supabase (misma instancia o proyecto demo separado)
+#   SUPABASE_ANON_KEY          — Clave anónima Supabase
+#   SUPABASE_SERVICE_ROLE_KEY  — Clave service role Supabase
+#   RESEND_API_KEY             — Key Resend (re_TestXXX para test sin envíos reales)
+#   CONFIRM_BASE_URL           — URL del frontend demo (ej. https://erp-demo.pages.dev)
+#   ALLOWED_ORIGINS            — Misma URL que CONFIRM_BASE_URL
+#   VP_WEBHOOK_SECRET          — (opcional en demo) Secret HMAC para webhooks VP
+#
+[env.demo]
+name = "gestion-siniestros"
+
+[env.demo.vars]
+ENVIRONMENT = "demo"
+
+[env.demo.triggers]
+crons = ["0 7 * * *", "0 13 * * *"]
+
+
 # ─── Entorno de producción ───────────────────────────────────────────────────
 # Deploy: wrangler deploy --env production
 #

@@ -5,23 +5,35 @@ import { GlobalSearch } from '@/components/GlobalSearch';
 import { AlertBanner } from '@/components/AlertBanner';
 import { AppSidebar } from '@/components/AppSidebar';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { TopCockpit } from '@/components/layout/TopCockpit';
 import { useTheme } from '@/hooks/useTheme';
 
+const LS_COCKPIT_KEY = 'erp:cockpit:collapsed';
+
 export function AppLayout() {
-  // Inicializa el hook de tema para que quede activo en toda la app
   useTheme();
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen,      setSidebarOpen]      = useState(false);
+  const [cockpitCollapsed, setCockpitCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem(LS_COCKPIT_KEY) === 'true';
+  });
+
+  const toggleCockpit = () => {
+    setCockpitCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem(LS_COCKPIT_KEY, String(next));
+      return next;
+    });
+  };
 
   return (
     <div className="app-layout">
       {/* ── HEADER ── */}
       <header className="app-header">
         <div className="header-left">
-          {/* Hamburguesa — solo visible en móvil/tablet */}
           <button
             className="sidebar-toggle-btn"
-            onClick={() => setSidebarOpen(prev => !prev)}
+            onClick={() => setSidebarOpen((prev) => !prev)}
             aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
             type="button"
           >
@@ -31,25 +43,25 @@ export function AppLayout() {
           <Link to="/expedientes" className="logo">ERP Siniestros</Link>
         </div>
 
-        {/* Buscador global — ocupa el espacio central */}
         <GlobalSearch />
 
-        {/* Acciones del header */}
         <div className="header-right">
           <ThemeToggle />
         </div>
       </header>
 
       {/* ── SIDEBAR ── */}
-      <AppSidebar
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
+      <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* ── CONTENIDO PRINCIPAL ── */}
       <main className="app-main">
-        {/* Banner de alertas — se muestra dentro del área de contenido */}
+        {/* Cockpit operativo — sticky bajo el header */}
+        <TopCockpit collapsed={cockpitCollapsed} onToggle={toggleCockpit} />
+
+        {/* Alertas del sistema */}
         <AlertBanner />
+
+        {/* Página activa */}
         <Outlet />
       </main>
     </div>

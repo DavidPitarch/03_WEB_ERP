@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getFestivosParaSla } from './calendario';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -140,8 +141,8 @@ export async function calculateSlaStatus(
     };
   });
 
-  // 3. Fetch calendario laboral (festivos)
-  const festivos = await getCalendarioLaboral(
+  // 3. Fetch festivos (calendario_laboral + cal_festivos multi-ámbito)
+  const festivos = await getFestivosParaSla(
     supabase,
     toDateStr(fechaEncargo),
     toDateStr(fechaFin),

@@ -21,14 +21,17 @@ import {
   hashCustomerTrackingToken,
   validateCustomerTrackingToken,
 } from '../services/customer-tracking';
+import { sendCustomerTrackingEmail } from '../services/email-sender';
 
 export const customerTrackingPublicRoutes = new Hono<{ Bindings: Env }>();
-export const customerTrackingAdminRoutes = new Hono<{ Bindings: Env }>();
+export const customerTrackingAdminRoutes  = new Hono<{ Bindings: Env }>();
 
-const DEFAULT_TOKEN_TTL_HOURS = 72;
-const MAX_TOKEN_TTL_HOURS = 168;
-const DEFAULT_TOKEN_MAX_USES = 25;
-const DEFAULT_RESCHEDULE_MIN_HOURS = 4;
+const DEFAULT_TOKEN_TTL_HOURS       = 72;
+const MAX_TOKEN_TTL_HOURS           = 168;
+const DEFAULT_TOKEN_MAX_USES        = 25;
+const DEFAULT_RESCHEDULE_MIN_HOURS  = 4;
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function getServiceClient(env: Env) {
   return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
@@ -42,6 +45,12 @@ function getUserAgent(c: any): string | null {
 
 function err(code: string, message: string) {
   return { data: null, error: { code, message } };
+}
+
+/** Construye la URL pública del portal de cliente. En desarrollo usa fallback. */
+function buildTrackingUrl(env: Env, rawToken: string): string {
+  const base = env.CONFIRM_BASE_URL?.replace(/\/$/, '') ?? 'http://localhost:5173';
+  return `${base}/customer-tracking/${rawToken}`;
 }
 
 type TrackingTokenRow = {
@@ -69,14 +78,14 @@ async function insertAccessLog(
   },
 ) {
   await supabase.from('customer_tracking_access_logs').insert({
-    token_id: params.tokenId ?? null,
+    token_id:     params.tokenId     ?? null,
     expediente_id: params.expedienteId ?? null,
-    cita_id: params.citaId ?? null,
-    action: params.action,
-    ok: params.ok,
-    ip: params.ip,
-    user_agent: params.userAgent,
-    detalle: params.detalle ?? {},
+    cita_id:      params.citaId      ?? null,
+    action:       params.action,
+    ok:           params.ok,
+    ip:           params.ip,
+    user_agent:   params.userAgent,
+    detalle:      params.detalle ?? {},
   });
 }
 
@@ -111,9 +120,7 @@ async function resolveCurrentCita(
     .limit(1)
     .maybeSingle();
 
-  if (future.data?.id) {
-    return future.data;
-  }
+  if (future.data?.id) return future.data;
 
   const fallback = await supabase
     .from('citas')
@@ -138,9 +145,7 @@ async function resolveCustomerTrackingContext(
     .eq('id', expedienteId)
     .single();
 
-  if (!expediente) {
-    return null;
-  }
+  if (!expediente) return null;
 
   const cita = await resolveCurrentCita(supabase, expedienteId);
 
@@ -168,36 +173,34 @@ async function resolveCustomerTrackingContext(
   };
 }
 
-async function consumeToken(
-  supabase: SupabaseClient,
-  token: TrackingTokenRow,
-) {
+async function consumeToken(supabase: SupabaseClient, token: TrackingTokenRow) {
   await supabase
     .from('customer_tracking_tokens')
-    .update({
-      use_count: token.use_count + 1,
-      last_used_at: new Date().toISOString(),
-    })
+    .update({ use_count: token.use_count + 1, last_used_at: new Date().toISOString() })
     .eq('id', token.id);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN: POST / — Emitir enlace de seguimiento + enviar email al asegurado
+// ─────────────────────────────────────────────────────────────────────────────
 customerTrackingAdminRoutes.post('/', async (c) => {
-  const supabase = c.get('supabase');
-  const user = c.get('user');
-  const ip = getRequestIp(c);
-  const userAgent = getUserAgent(c);
-  const body = await c.req.json<CustomerTrackingIssueLinkRequest>();
+  const supabase   = c.get('supabase');
+  const user       = c.get('user');
+  const ip         = getRequestIp(c);
+  const userAgent  = getUserAgent(c);
+  const body       = await c.req.json<CustomerTrackingIssueLinkRequest>();
 
   if (!body.expediente_id) {
     return c.json(err('VALIDATION', 'expediente_id es requerido'), 422);
   }
 
   const ttlHours = Math.min(MAX_TOKEN_TTL_HOURS, Math.max(1, Number(body.ttl_hours) || DEFAULT_TOKEN_TTL_HOURS));
-  const maxUses = Math.max(1, Number(body.max_uses) || DEFAULT_TOKEN_MAX_USES);
+  const maxUses  = Math.max(1, Number(body.max_uses) || DEFAULT_TOKEN_MAX_USES);
 
+  // Cargar expediente con datos del asegurado y compañía para el email
   const { data: expediente } = await supabase
     .from('expedientes')
-    .select('id, numero_expediente')
+    .select('id, numero_expediente, asegurados(nombre, apellidos, email), companias(nombre)')
     .eq('id', body.expediente_id)
     .maybeSingle();
 
@@ -205,6 +208,7 @@ customerTrackingAdminRoutes.post('/', async (c) => {
     return c.json(err('NOT_FOUND', 'Expediente no encontrado'), 404);
   }
 
+  // Revocar tokens activos anteriores
   const now = new Date().toISOString();
   const { data: activeTokens } = await supabase
     .from('customer_tracking_tokens')
@@ -215,80 +219,275 @@ customerTrackingAdminRoutes.post('/', async (c) => {
   if ((activeTokens ?? []).length > 0) {
     await supabase
       .from('customer_tracking_tokens')
-      .update({
-        revoked_at: now,
-        revoked_by: user.id,
-        revoke_reason: 'replaced_by_new_issue',
-      })
+      .update({ revoked_at: now, revoked_by: user.id, revoke_reason: 'replaced_by_new_issue' })
       .eq('expediente_id', body.expediente_id)
       .is('revoked_at', null);
   }
 
-  const rawToken = crypto.randomUUID();
+  // Generar token
+  const rawToken  = crypto.randomUUID();
   const tokenHash = await hashCustomerTrackingToken(rawToken);
   const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000).toISOString();
+  const trackingUrl = buildTrackingUrl(c.env, rawToken);
 
-  const { data: tokenRow, error } = await supabase
+  const { data: tokenRow, error: tokenError } = await supabase
     .from('customer_tracking_tokens')
     .insert({
       expediente_id: body.expediente_id,
-      token_hash: tokenHash,
-      expires_at: expiresAt,
-      max_uses: maxUses,
-      created_by: user.id,
+      token_hash:    tokenHash,
+      expires_at:    expiresAt,
+      max_uses:      maxUses,
+      created_by:    user.id,
+      tracking_url:  trackingUrl,
     })
     .select('id')
     .single();
 
-  if (error || !tokenRow?.id) {
-    return c.json(err('DB_ERROR', error?.message ?? 'No se pudo emitir el enlace'), 500);
+  if (tokenError || !tokenRow?.id) {
+    return c.json(err('DB_ERROR', tokenError?.message ?? 'No se pudo emitir el enlace'), 500);
   }
 
+  // Datos del asegurado
+  const asegurado   = (expediente as any).asegurados ?? null;
+  const aseguradoEmail  = asegurado?.email ?? null;
+  const aseguradoNombre = [asegurado?.nombre, asegurado?.apellidos].filter(Boolean).join(' ') || 'cliente';
+  const companiaLabel   = (expediente as any).companias?.nombre ?? null;
+
+  // ── Trazabilidad: access log + audit + domain event + timeline ────────────
   await Promise.all([
     insertAccessLog(supabase, {
-      tokenId: tokenRow.id,
+      tokenId:      tokenRow.id,
       expedienteId: body.expediente_id,
-      action: 'emitir_link',
-      ok: true,
+      action:       'emitir_link',
+      ok:           true,
       ip,
       userAgent,
-      detalle: { expires_at: expiresAt, revoked_previous_count: (activeTokens ?? []).length },
+      detalle: {
+        expires_at:              expiresAt,
+        tracking_url:            trackingUrl,
+        revoked_previous_count:  (activeTokens ?? []).length,
+        has_email:               Boolean(aseguradoEmail),
+      },
     }),
     insertAudit(supabase, {
-      tabla: 'customer_tracking_tokens',
+      tabla:       'customer_tracking_tokens',
       registro_id: tokenRow.id,
-      accion: 'INSERT',
-      actor_id: user.id,
-      cambios: { expediente_id: body.expediente_id, expires_at: expiresAt, max_uses: maxUses },
-      ip: ip ?? undefined,
+      accion:      'INSERT',
+      actor_id:    user.id,
+      cambios:     { expediente_id: body.expediente_id, expires_at: expiresAt, max_uses: maxUses, tracking_url: trackingUrl },
+      ip:          ip ?? undefined,
+    }),
+    insertDomainEvent(supabase, {
+      aggregate_id:   body.expediente_id,
+      aggregate_type: 'expediente',
+      event_type:     'CustomerTrackingLinkEmitido',
+      payload:        { token_id: tokenRow.id, expediente_id: body.expediente_id, expires_at: expiresAt, has_email: Boolean(aseguradoEmail) },
+      actor_id:       user.id,
+    }),
+    insertExpedienteTimelineEntry(supabase, {
+      expedienteId: body.expediente_id,
+      actorId:      user.id,
+      actorScope:   'sistema',
+      actorName:    'Backoffice',
+      type:         'sistema',
+      subject:      'Enlace de seguimiento emitido',
+      content:      aseguradoEmail
+        ? `Se ha generado y enviado un enlace de seguimiento al cliente (${aseguradoEmail}). Caduca el ${expiresAt.slice(0, 10)}.`
+        : 'Se ha generado un enlace de seguimiento. El asegurado no tiene email: distribución manual.',
+      metadata: buildCustomerTrackingActionMetadata('Enlace de seguimiento emitido', 'emitir_link'),
     }),
   ]);
 
+  // ── Envío de email ────────────────────────────────────────────────────────
+  let emailSent   = false;
+  let emailStatus: 'sent' | 'dry_run' | 'failed' | 'no_email' = 'no_email';
+
+  if (aseguradoEmail) {
+    const emailResult = await sendCustomerTrackingEmail(
+      supabase,
+      c.env.RESEND_API_KEY,
+      {
+        tokenId:          tokenRow.id,
+        to:               aseguradoEmail,
+        aseguradoNombre,
+        numeroExpediente: expediente.numero_expediente,
+        companiaLabel,
+        trackingUrl,
+        expiresAt,
+      },
+      user.id,
+    );
+
+    emailSent   = emailResult.success;
+    emailStatus = emailResult.dryRun ? 'dry_run' : emailResult.success ? 'sent' : 'failed';
+
+    // Si no hay key de email, el status ya queda en dry_run (no interrumpe el flujo)
+  } else {
+    // Marcar explícitamente que no había email de destino
+    await supabase
+      .from('customer_tracking_tokens')
+      .update({ email_status: 'no_email' })
+      .eq('id', tokenRow.id);
+  }
+
   const response: CustomerTrackingIssueLinkResponse = {
-    expediente_id: body.expediente_id,
-    token: rawToken,
-    path: `/customer-tracking/${rawToken}`,
-    expires_at: expiresAt,
+    expediente_id:          body.expediente_id,
+    token:                  rawToken,
+    path:                   `/customer-tracking/${rawToken}`,
+    tracking_url:           trackingUrl,
+    expires_at:             expiresAt,
     revoked_previous_count: (activeTokens ?? []).length,
+    email_sent:             emailSent,
+    email_status:           emailStatus,
   };
 
   return c.json({ data: response, error: null }, 201);
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN: POST /:tokenId/revocar — Revocar un token activo explícitamente
+// ─────────────────────────────────────────────────────────────────────────────
+customerTrackingAdminRoutes.post('/:tokenId/revocar', async (c) => {
+  const supabase  = c.get('supabase');
+  const user      = c.get('user');
+  const ip        = getRequestIp(c);
+  const tokenId   = c.req.param('tokenId');
+
+  const { data: tokenRow } = await supabase
+    .from('customer_tracking_tokens')
+    .select('id, expediente_id, revoked_at')
+    .eq('id', tokenId)
+    .maybeSingle();
+
+  if (!tokenRow?.id) {
+    return c.json(err('NOT_FOUND', 'Token no encontrado'), 404);
+  }
+  if (tokenRow.revoked_at) {
+    return c.json(err('ALREADY_REVOKED', 'El token ya está revocado'), 409);
+  }
+
+  const now = new Date().toISOString();
+  await supabase
+    .from('customer_tracking_tokens')
+    .update({ revoked_at: now, revoked_by: user.id, revoke_reason: 'manual_revocation' })
+    .eq('id', tokenId);
+
+  await Promise.all([
+    insertAudit(supabase, {
+      tabla:       'customer_tracking_tokens',
+      registro_id: tokenId,
+      accion:      'UPDATE',
+      actor_id:    user.id,
+      cambios:     { revoked_at: now, revoke_reason: 'manual_revocation' },
+      ip:          ip ?? undefined,
+    }),
+    insertDomainEvent(supabase, {
+      aggregate_id:   tokenRow.expediente_id,
+      aggregate_type: 'expediente',
+      event_type:     'CustomerTrackingLinkRevocado',
+      payload:        { token_id: tokenId, expediente_id: tokenRow.expediente_id, revoked_at: now },
+      actor_id:       user.id,
+    }),
+  ]);
+
+  return c.json({ data: { revoked: true, token_id: tokenId, revoked_at: now }, error: null });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN: POST /reenviar — Reenviar email del enlace activo de un expediente
+// ─────────────────────────────────────────────────────────────────────────────
+customerTrackingAdminRoutes.post('/reenviar', async (c) => {
+  const supabase  = c.get('supabase');
+  const user      = c.get('user');
+  const body      = await c.req.json<{ expediente_id: string }>().catch(() => ({ expediente_id: '' }));
+
+  if (!body.expediente_id) {
+    return c.json(err('VALIDATION', 'expediente_id es requerido'), 422);
+  }
+
+  // Obtener token activo
+  const { data: activeToken } = await supabase
+    .from('customer_tracking_tokens')
+    .select('id, tracking_url, expires_at')
+    .eq('expediente_id', body.expediente_id)
+    .is('revoked_at', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!activeToken?.id) {
+    return c.json(err('NOT_FOUND', 'No hay enlace activo para este expediente. Emite uno nuevo.'), 404);
+  }
+
+  // Comprobar que no esté expirado
+  if (new Date(activeToken.expires_at) < new Date()) {
+    return c.json(err('TOKEN_EXPIRADO', 'El enlace activo ha expirado. Emite uno nuevo.'), 410);
+  }
+
+  // Datos del asegurado
+  const { data: expediente } = await supabase
+    .from('expedientes')
+    .select('numero_expediente, asegurados(nombre, apellidos, email), companias(nombre)')
+    .eq('id', body.expediente_id)
+    .maybeSingle();
+
+  if (!expediente) {
+    return c.json(err('NOT_FOUND', 'Expediente no encontrado'), 404);
+  }
+
+  const asegurado      = (expediente as any).asegurados ?? null;
+  const aseguradoEmail = asegurado?.email ?? null;
+
+  if (!aseguradoEmail) {
+    return c.json(err('NO_EMAIL', 'El asegurado no tiene email registrado. Distribuye el enlace manualmente.'), 422);
+  }
+
+  const aseguradoNombre = [asegurado?.nombre, asegurado?.apellidos].filter(Boolean).join(' ') || 'cliente';
+  const companiaLabel   = (expediente as any).companias?.nombre ?? null;
+  const trackingUrl     = activeToken.tracking_url ?? buildTrackingUrl(c.env, '');
+
+  const emailResult = await sendCustomerTrackingEmail(
+    supabase,
+    c.env.RESEND_API_KEY,
+    {
+      tokenId:          activeToken.id,
+      to:               aseguradoEmail,
+      aseguradoNombre,
+      numeroExpediente: expediente.numero_expediente,
+      companiaLabel,
+      trackingUrl,
+      expiresAt:        activeToken.expires_at,
+    },
+    user.id,
+  );
+
+  return c.json({
+    data: {
+      reenvio: true,
+      email_sent:   emailResult.success,
+      email_status: emailResult.dryRun ? 'dry_run' : emailResult.success ? 'sent' : 'failed',
+    },
+    error: null,
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLIC: GET /:token — Vista de seguimiento del cliente
+// ─────────────────────────────────────────────────────────────────────────────
 customerTrackingPublicRoutes.get('/:token', async (c) => {
-  const supabase = getServiceClient(c.env);
-  const rawToken = c.req.param('token');
-  const ip = getRequestIp(c);
+  const supabase  = getServiceClient(c.env);
+  const rawToken  = c.req.param('token');
+  const ip        = getRequestIp(c);
   const userAgent = getUserAgent(c);
-  const token = await findTokenByRawValue(supabase, rawToken);
+  const token     = await findTokenByRawValue(supabase, rawToken);
   const validation = validateCustomerTrackingToken(token);
 
   if (!validation.ok) {
     await insertAccessLog(supabase, {
-      tokenId: token?.id ?? null,
+      tokenId:      token?.id ?? null,
       expedienteId: token?.expediente_id ?? null,
-      action: 'view',
-      ok: false,
+      action:       'view',
+      ok:           false,
       ip,
       userAgent,
       detalle: { code: validation.code },
@@ -303,13 +502,13 @@ customerTrackingPublicRoutes.get('/:token', async (c) => {
 
   const view = buildCustomerTrackingView({
     expediente: {
-      id: context.expediente.id,
+      id:                context.expediente.id,
       numero_expediente: context.expediente.numero_expediente,
-      estado: context.expediente.estado,
-      tipo_siniestro: context.expediente.tipo_siniestro,
-      updated_at: context.expediente.updated_at,
+      estado:            context.expediente.estado,
+      tipo_siniestro:    context.expediente.tipo_siniestro,
+      updated_at:        context.expediente.updated_at,
     },
-    cita: context.cita,
+    cita:     context.cita,
     operario: context.operario,
     contacto: context.contacto,
     timeline: context.timeline,
@@ -318,11 +517,11 @@ customerTrackingPublicRoutes.get('/:token', async (c) => {
   await Promise.all([
     consumeToken(supabase, token!),
     insertAccessLog(supabase, {
-      tokenId: token!.id,
+      tokenId:      token!.id,
       expedienteId: token!.expediente_id,
-      citaId: context.cita?.id ?? null,
-      action: 'view',
-      ok: true,
+      citaId:       context.cita?.id ?? null,
+      action:       'view',
+      ok:           true,
       ip,
       userAgent,
     }),
@@ -331,20 +530,23 @@ customerTrackingPublicRoutes.get('/:token', async (c) => {
   return c.json({ data: view, error: null });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLIC: POST /:token/confirmar-cita
+// ─────────────────────────────────────────────────────────────────────────────
 customerTrackingPublicRoutes.post('/:token/confirmar-cita', async (c) => {
-  const supabase = getServiceClient(c.env);
-  const rawToken = c.req.param('token');
-  const ip = getRequestIp(c);
+  const supabase  = getServiceClient(c.env);
+  const rawToken  = c.req.param('token');
+  const ip        = getRequestIp(c);
   const userAgent = getUserAgent(c);
-  const token = await findTokenByRawValue(supabase, rawToken);
+  const token     = await findTokenByRawValue(supabase, rawToken);
   const validation = validateCustomerTrackingToken(token);
 
   if (!validation.ok) {
     await insertAccessLog(supabase, {
-      tokenId: token?.id ?? null,
+      tokenId:      token?.id ?? null,
       expedienteId: token?.expediente_id ?? null,
-      action: 'confirmar_cita',
-      ok: false,
+      action:       'confirmar_cita',
+      ok:           false,
       ip,
       userAgent,
       detalle: { code: validation.code },
@@ -364,83 +566,81 @@ customerTrackingPublicRoutes.post('/:token/confirmar-cita', async (c) => {
   const now = new Date().toISOString();
   const { error } = await supabase
     .from('citas')
-    .update({
-      estado: 'confirmada',
-      customer_confirmed_at: now,
-    })
+    .update({ estado: 'confirmada', customer_confirmed_at: now })
     .eq('id', cita.id);
 
-  if (error) {
-    return c.json(err('DB_ERROR', error.message), 500);
-  }
+  if (error) return c.json(err('DB_ERROR', error.message), 500);
 
   await Promise.all([
     consumeToken(supabase, token!),
     insertAccessLog(supabase, {
-      tokenId: token!.id,
+      tokenId:      token!.id,
       expedienteId: token!.expediente_id,
-      citaId: cita.id,
-      action: 'confirmar_cita',
-      ok: true,
+      citaId:       cita.id,
+      action:       'confirmar_cita',
+      ok:           true,
       ip,
       userAgent,
     }),
     insertExpedienteTimelineEntry(supabase, {
       expedienteId: token!.expediente_id,
-      actorId: token!.created_by,
-      actorScope: 'sistema',
-      actorName: 'Portal cliente',
-      type: 'sistema',
-      subject: 'Cliente confirma cita',
-      content: `El cliente ha confirmado la cita del ${cita.fecha} ${cita.franja_inicio}-${cita.franja_fin}.`,
-      metadata: buildCustomerTrackingActionMetadata('Cita confirmada', 'confirmar_cita'),
+      actorId:      token!.created_by,
+      actorScope:   'sistema',
+      actorName:    'Portal cliente',
+      type:         'sistema',
+      subject:      'Cliente confirma cita',
+      content:      `El cliente ha confirmado la cita del ${cita.fecha} ${cita.franja_inicio}-${cita.franja_fin}.`,
+      metadata:     buildCustomerTrackingActionMetadata('Cita confirmada', 'confirmar_cita'),
     }),
     insertAudit(supabase, {
-      tabla: 'citas',
+      tabla:       'citas',
       registro_id: cita.id,
-      accion: 'UPDATE',
-      actor_id: token!.created_by,
-      cambios: { estado: 'confirmada', customer_confirmed_at: now, source: 'customer_tracking' },
-      ip: ip ?? undefined,
+      accion:      'UPDATE',
+      actor_id:    token!.created_by,
+      cambios:     { estado: 'confirmada', customer_confirmed_at: now, source: 'customer_tracking' },
+      ip:          ip ?? undefined,
     }),
     insertDomainEvent(supabase, {
-      aggregate_id: cita.id,
+      aggregate_id:   cita.id,
       aggregate_type: 'cita',
-      event_type: 'ClienteConfirmaCita',
-      payload: { expediente_id: token!.expediente_id, cita_id: cita.id },
-      actor_id: token!.created_by,
+      event_type:     'ClienteConfirmaCita',
+      payload:        { expediente_id: token!.expediente_id, cita_id: cita.id },
+      actor_id:       token!.created_by,
     }),
   ]);
 
   const response: CustomerTrackingConfirmCitaResponse = {
-    cita_id: cita.id,
-    estado: 'confirmada',
+    cita_id:               cita.id,
+    estado:                'confirmada',
     customer_confirmed_at: now,
   };
 
   return c.json({ data: response, error: null });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLIC: POST /:token/solicitar-cambio
+// ─────────────────────────────────────────────────────────────────────────────
 customerTrackingPublicRoutes.post('/:token/solicitar-cambio', async (c) => {
-  const supabase = getServiceClient(c.env);
-  const rawToken = c.req.param('token');
-  const body = await c.req.json<CustomerTrackingSolicitarCambioRequest>();
-  const ip = getRequestIp(c);
+  const supabase  = getServiceClient(c.env);
+  const rawToken  = c.req.param('token');
+  const body      = await c.req.json<CustomerTrackingSolicitarCambioRequest>();
+  const ip        = getRequestIp(c);
   const userAgent = getUserAgent(c);
 
   if (!body.franja_solicitada?.trim() || !body.motivo?.trim()) {
     return c.json(err('VALIDATION', 'franja_solicitada y motivo son requeridos'), 422);
   }
 
-  const token = await findTokenByRawValue(supabase, rawToken);
+  const token    = await findTokenByRawValue(supabase, rawToken);
   const validation = validateCustomerTrackingToken(token);
 
   if (!validation.ok) {
     await insertAccessLog(supabase, {
-      tokenId: token?.id ?? null,
+      tokenId:      token?.id ?? null,
       expedienteId: token?.expediente_id ?? null,
-      action: 'solicitar_cambio',
-      ok: false,
+      action:       'solicitar_cambio',
+      ok:           false,
       ip,
       userAgent,
       detalle: { code: validation.code },
@@ -459,78 +659,72 @@ customerTrackingPublicRoutes.post('/:token/solicitar-cambio', async (c) => {
 
   const now = new Date().toISOString();
   const updates = {
-    customer_reschedule_requested_at: now,
+    customer_reschedule_requested_at:   now,
     customer_reschedule_requested_slot: body.franja_solicitada.trim(),
-    customer_reschedule_motivo: body.motivo.trim(),
-    customer_reschedule_status: 'pendiente',
+    customer_reschedule_motivo:         body.motivo.trim(),
+    customer_reschedule_status:         'pendiente',
   };
 
-  const { error } = await supabase
-    .from('citas')
-    .update(updates)
-    .eq('id', cita.id);
-
-  if (error) {
-    return c.json(err('DB_ERROR', error.message), 500);
-  }
+  const { error } = await supabase.from('citas').update(updates).eq('id', cita.id);
+  if (error) return c.json(err('DB_ERROR', error.message), 500);
 
   await Promise.all([
     consumeToken(supabase, token!),
     insertAccessLog(supabase, {
-      tokenId: token!.id,
+      tokenId:      token!.id,
       expedienteId: token!.expediente_id,
-      citaId: cita.id,
-      action: 'solicitar_cambio',
-      ok: true,
+      citaId:       cita.id,
+      action:       'solicitar_cambio',
+      ok:           true,
       ip,
       userAgent,
       detalle: { franja_solicitada: body.franja_solicitada.trim() },
     }),
     insertExpedienteTimelineEntry(supabase, {
       expedienteId: token!.expediente_id,
-      actorId: token!.created_by,
-      actorScope: 'sistema',
-      actorName: 'Portal cliente',
-      type: 'sistema',
-      subject: 'Cliente solicita cambio de cita',
-      content: `El cliente solicita nueva franja "${body.franja_solicitada.trim()}" por el motivo: ${body.motivo.trim()}.`,
-      metadata: buildCustomerTrackingActionMetadata('Solicitud de cambio recibida', 'solicitar_cambio'),
+      actorId:      token!.created_by,
+      actorScope:   'sistema',
+      actorName:    'Portal cliente',
+      type:         'sistema',
+      subject:      'Cliente solicita cambio de cita',
+      content:      `El cliente solicita nueva franja "${body.franja_solicitada.trim()}" por el motivo: ${body.motivo.trim()}.`,
+      metadata:     buildCustomerTrackingActionMetadata('Solicitud de cambio recibida', 'solicitar_cambio'),
     }),
     supabase.from('alertas').insert({
-      tipo: 'custom',
-      titulo: 'Cliente solicita cambio de cita',
-      mensaje: `Nueva franja solicitada: ${body.franja_solicitada.trim()}. Motivo: ${body.motivo.trim()}.`,
+      tipo:          'custom',
+      titulo:        'Cliente solicita cambio de cita',
+      mensaje:       `Nueva franja solicitada: ${body.franja_solicitada.trim()}. Motivo: ${body.motivo.trim()}.`,
       expediente_id: token!.expediente_id,
-      prioridad: 'media',
-      estado: 'activa',
+      prioridad:     'media',
+      estado:        'activa',
     }),
     insertAudit(supabase, {
-      tabla: 'citas',
+      tabla:       'citas',
       registro_id: cita.id,
-      accion: 'UPDATE',
-      actor_id: token!.created_by,
-      cambios: { ...updates, source: 'customer_tracking' },
-      ip: ip ?? undefined,
+      accion:      'UPDATE',
+      actor_id:    token!.created_by,
+      cambios:     { ...updates, source: 'customer_tracking' },
+      ip:          ip ?? undefined,
     }),
     insertDomainEvent(supabase, {
-      aggregate_id: cita.id,
+      aggregate_id:   cita.id,
       aggregate_type: 'cita',
-      event_type: 'ClienteSolicitaCambioCita',
+      event_type:     'ClienteSolicitaCambioCita',
       payload: {
-        expediente_id: token!.expediente_id,
-        cita_id: cita.id,
+        expediente_id:     token!.expediente_id,
+        cita_id:           cita.id,
         franja_solicitada: body.franja_solicitada.trim(),
-        motivo: body.motivo.trim(),
+        motivo:            body.motivo.trim(),
       },
       actor_id: token!.created_by,
     }),
   ]);
 
   const response: CustomerTrackingSolicitarCambioResponse = {
-    cita_id: cita.id,
-    estado: cita.estado,
+    cita_id:                          cita.id,
+    estado:                           cita.estado,
     customer_reschedule_requested_at: now,
-    customer_reschedule_status: 'pendiente',
+    customer_reschedule_status:       'pendiente',
   };
 
   return c.json({ data: response, error: null });

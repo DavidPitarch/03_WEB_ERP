@@ -1,7 +1,11 @@
 import { supabase } from './supabase';
 import type { ApiResult } from '@erp/types';
 
-const API_BASE = '/api/v1';
+// En dev: Vite hace proxy de /api → localhost:8787 (no se necesita VITE_API_URL).
+// En CF Pages / demo: VITE_API_URL debe apuntar al worker, ej. https://erp-siniestros-api-demo.workers.dev
+const API_BASE = import.meta.env.VITE_API_URL
+  ? `${(import.meta.env.VITE_API_URL as string).replace(/\/$/, '')}/api/v1`
+  : '/api/v1';
 
 async function getToken(): Promise<string> {
   const { data } = await supabase.auth.getSession();

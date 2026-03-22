@@ -5,6 +5,7 @@ import type { CustomerTrackingIssueLinkResponse } from '@erp/types';
 import { useExpediente, useExpedienteTimeline, useExpedientePartes, useTransicionEstado } from '@/hooks/useExpedientes';
 import { useRealtimeExpediente } from '@/hooks/useRealtime';
 import { NuevaCitaModal } from '@/components/NuevaCitaModal';
+import { EmitirAutocitaButton } from '@/components/EmitirAutocitaButton';
 import { api } from '@/lib/api';
 
 const ESTADO_LABELS: Record<string, string> = {
@@ -199,6 +200,19 @@ export function ExpedienteDetailPage() {
           </div>
         )}
       </section>
+
+      {/* Autocita */}
+      {['EN_PLANIFICACION', 'EN_CURSO', 'PENDIENTE_CLIENTE'].includes(e.estado) && (
+        <section className="detail-section">
+          <div className="customer-link-header">
+            <div>
+              <h3>Autocita</h3>
+              <p className="text-muted">El cliente elige o confirma su cita directamente desde un enlace seguro.</p>
+            </div>
+          </div>
+          <EmitirAutocitaButton expedienteId={id!} />
+        </section>
+      )}
 
       {/* Partes de operario */}
       {partes.length > 0 && (

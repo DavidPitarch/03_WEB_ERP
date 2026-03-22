@@ -1,3 +1,29 @@
+# Copia este fichero a .dev.vars y rellena los valores reales.
+# .dev.vars es leído por `wrangler dev` como variables de entorno del worker.
+# NUNCA subas .dev.vars al repositorio.
+
+# ── Supabase ──────────────────────────────────────────────────────────────────
 SUPABASE_URL=https://tu-proyecto.supabase.co
 SUPABASE_ANON_KEY=eyJ...tu-anon-key
 SUPABASE_SERVICE_ROLE_KEY=eyJ...tu-service-role-key
+
+# ── Resend ────────────────────────────────────────────────────────────────────
+# Dejar vacío → modo dry-run: los emails se imprimen en consola, no se envían.
+# Para demos: usa una re_TestXXXX key de Resend (las llamadas tienen éxito pero
+#   los emails van a delivered@resend.dev, nunca a destinatarios reales).
+RESEND_API_KEY=
+
+# ── URLs públicas ─────────────────────────────────────────────────────────────
+# URL base del portal público de cliente (customer-tracking / autocita).
+# En dev: http://localhost:5173 (también es el fallback si se omite).
+# En demo: URL del frontend desplegado, ej. https://erp-demo.pages.dev
+CONFIRM_BASE_URL=http://localhost:5173
+
+# Orígenes CORS adicionales, separados por coma (localhost:5173/5174 siempre incluidos).
+# En demo: https://erp-demo.pages.dev
+ALLOWED_ORIGINS=
+
+# ── Videoperitaciones ─────────────────────────────────────────────────────────
+# Secret HMAC para verificar firma de webhooks del proveedor VP.
+# Dejar vacío en dev si no se usan videoperitaciones.
+VP_WEBHOOK_SECRET=

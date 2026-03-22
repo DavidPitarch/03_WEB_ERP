@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { getRequestIp } from '../http/request-metadata';
 import { createCitaCommand, normalizeCommandError, } from '../services/core-commands';
+import { checkDisponibilidad, assertDisponibilidadOk } from '../services/calendario';
 export const citasRoutes = new Hono();
 // POST /citas - Crear cita
 citasRoutes.post('/', async (c) => {
@@ -12,6 +13,29 @@ citasRoutes.post('/', async (c) => {
     if (missing.length > 0) {
         return c.json({ data: null, error: { code: 'VALIDATION', message: `Campos requeridos: ${missing.join(', ')}` } }, 422);
     }
+    // ── Comprobación de disponibilidad del operario ──────────────────────────
+    // omitir_disponibilidad sólo para roles con excepción justificada (admin/supervisor)
+    const omitir = body.omitir_disponibilidad === true && ['admin', 'supervisor'].some((r) => user.roles?.includes(r));
+    if (!omitir) {
+        try {
+            const disponibilidad = await checkDisponibilidad(c.get('supabase'), body.operario_id, body.fecha, body.franja_inicio, body.franja_fin);
+            assertDisponibilidadOk(disponibilidad);
+        }
+        catch (dispError) {
+            if (dispError.code === 'OPERARIO_NO_DISPONIBLE') {
+                return c.json({
+                    data: null,
+                    error: {
+                        code: 'OPERARIO_NO_DISPONIBLE',
+                        message: dispError.message,
+                        details: dispError.details,
+                    },
+                }, 422);
+            }
+            // Si falla la comprobación por error de BD, continuar (no bloquear operaciones)
+        }
+    }
+    // ── Fin comprobación ─────────────────────────────────────────────────────
     try {
         const data = await createCitaCommand(supabase, {
             expediente_id: body.expediente_id,

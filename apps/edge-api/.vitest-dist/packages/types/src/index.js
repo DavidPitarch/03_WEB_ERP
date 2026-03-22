@@ -61,6 +61,25 @@ export const DOMAIN_EVENT_TYPES = [
     'VideoperitacionReprogramada',
     'VideoperitacionCancelada',
     'LinkVideoperitacionEnviado',
+    'AutocitaTokenEmitido',
+    'AutocitaCitaConfirmada',
+    'AutocitaCambioSolicitado',
+    'AutocitaSlotSeleccionado',
+    'AutocitaSlotNoDisponible',
+    'AutocitaLimiteCambiosAlcanzado',
+    'AutocitaTokenExpirado',
+    // EP-12 Customer Tracking
+    'CustomerTrackingLinkEmitido',
+    'CustomerTrackingLinkRevocado',
+    'CustomerTrackingEmailEnviado',
+];
+// ─── Eventos de dominio geo ───
+export const GEO_EVENT_TYPES = [
+    'GeoExpedienteGeocodificado',
+    'GeoAsignacionCreada',
+    'GeoAsignacionRechazada',
+    'GeoSobrecargaDetectada',
+    'GeoPosicionActualizada',
 ];
 // ─── Origen del expediente ───
 export const EXPEDIENTE_ORIGENES = ['manual', 'api', 'webhook', 'email', 'import'];
@@ -76,6 +95,17 @@ export const CAUSA_PENDIENTE = ['material', 'perito', 'cliente_ausente', 'client
 export const FACTURA_ESTADOS = ['borrador', 'emitida', 'enviada', 'cobrada', 'anulada'];
 export const ESTADO_COBRO = ['pendiente', 'vencida', 'reclamada', 'cobrada', 'incobrable'];
 export const CANAL_ENVIO = ['email', 'api', 'portal', 'manual'];
+// ─── Ep-13: Config. emisión ───
+export const TIPO_DOCUMENTO_SERIE = [
+    'factura', 'factura_simplificada', 'autofactura', 'abono', 'rectificativa',
+];
+export const TIPO_TERCERO_SERIE = [
+    'compania', 'cliente_final', 'operario_autonomo', 'proveedor', 'grupo_empresa', 'cualquiera',
+];
+export const FLUJO_ORIGEN_SERIE = [
+    'expediente', 'videoperitacion', 'manual', 'subcontrata', 'cualquiera',
+];
+export const SISTEMA_FISCAL = ['ninguno', 'ticketbai', 'facturae', 'verifactu'];
 // ─── EP-09: Proveedores y logística de materiales ───
 export const PEDIDO_ESTADOS = ['pendiente', 'enviado', 'confirmado', 'listo_para_recoger', 'recogido', 'caducado', 'cancelado'];
 // ─── EP-10: BI, Reporting y Autofacturación ───

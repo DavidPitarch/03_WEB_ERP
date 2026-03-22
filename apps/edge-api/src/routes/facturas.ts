@@ -394,28 +394,99 @@ facturasRoutes.post('/emitir', async (c) => {
     await supabase.from('lineas_factura').insert(lineasFactura);
   }
 
-  // 7. Audit + domain event
-  // 8. Timeline entry
+  // 7. Auto-aplicar perfil_cobro y generar referencia_cobro si existe perfil configurado
+  let referencia_cobro_id: string | null = null;
+  try {
+    const { data: perfil } = await supabase
+      .from('perfiles_cobro')
+      .select('id, dias_pago, dia_fijo_mes, cuenta_bancaria_id, forma_pago')
+      .eq('compania_id', expediente.compania_id)
+      .eq('empresa_id', expediente.empresa_facturadora_id)
+      .eq('activo', true)
+      .maybeSingle();
+
+    if (perfil) {
+      // Recalcular fecha_vencimiento con las condiciones del perfil
+      const diasPago = perfil.dias_pago ?? diasVencimiento;
+      const diaFijo  = perfil.dia_fijo_mes ?? null;
+      const baseDate = new Date(now);
+      baseDate.setDate(baseDate.getDate() + diasPago);
+      if (diaFijo) {
+        const result = new Date(baseDate);
+        result.setDate(diaFijo);
+        if (result <= baseDate) result.setMonth(result.getMonth() + 1);
+        factura.fecha_vencimiento = result.toISOString().slice(0, 10);
+        await supabase.from('facturas').update({ fecha_vencimiento: factura.fecha_vencimiento }).eq('id', factura.id);
+      }
+
+      // Generar referencia atómica vía función PostgreSQL
+      const { data: refData, error: rpcErr } = await supabase
+        .rpc('fn_next_referencia_cobro', { p_empresa_id: expediente.empresa_facturadora_id });
+
+      if (!rpcErr && refData?.[0]) {
+        const { referencia } = refData[0];
+        const concepto = `Factura ${numero_factura} - ${empresa.nombre}`;
+
+        const { data: refCobro } = await supabase
+          .from('referencias_cobro')
+          .insert({
+            factura_id:       factura.id,
+            empresa_id:       expediente.empresa_facturadora_id,
+            compania_id:      expediente.compania_id,
+            referencia,
+            concepto,
+            importe:          total,
+            moneda:           'EUR',
+            fecha_vencimiento: factura.fecha_vencimiento,
+            canal_cobro:      perfil.forma_pago,
+            estado:           'pendiente',
+          })
+          .select()
+          .single();
+
+        if (refCobro) {
+          referencia_cobro_id = refCobro.id;
+          await supabase
+            .from('facturas')
+            .update({
+              perfil_cobro_id:    perfil.id,
+              cuenta_cobro_id:    perfil.cuenta_bancaria_id ?? null,
+              referencia_cobro_id: refCobro.id,
+            })
+            .eq('id', factura.id);
+
+          factura.perfil_cobro_id    = perfil.id;
+          factura.cuenta_cobro_id    = perfil.cuenta_bancaria_id ?? null;
+          factura.referencia_cobro_id = refCobro.id;
+          factura.referencia_cobro   = referencia;
+        }
+      }
+    }
+  } catch (_e) {
+    // La generación de referencia es best-effort; no bloquea la emisión
+  }
+
+  // 8. Audit + domain event + timeline
   await Promise.all([
     insertAudit(supabase, {
       tabla: 'facturas',
       registro_id: factura.id,
       accion: 'INSERT',
       actor_id: user.id,
-      cambios: { numero_factura, total, expediente_id: body.expediente_id, serie_id: body.serie_id },
+      cambios: { numero_factura, total, expediente_id: body.expediente_id, serie_id: body.serie_id, referencia_cobro_id },
     }),
     insertDomainEvent(supabase, {
       aggregate_id: factura.id,
       aggregate_type: 'factura',
       event_type: 'FacturaEmitida',
-      payload: { numero_factura, total, expediente_id: body.expediente_id, presupuesto_id: presupuesto.id },
+      payload: { numero_factura, total, expediente_id: body.expediente_id, presupuesto_id: presupuesto.id, referencia_cobro_id },
       actor_id: user.id,
     }),
     supabase.from('comunicaciones').insert({
       expediente_id: body.expediente_id,
       tipo: 'sistema',
       asunto: 'Factura emitida',
-      contenido: `Factura ${numero_factura} emitida por ${total} EUR`,
+      contenido: `Factura ${numero_factura} emitida por ${total} EUR${referencia_cobro_id ? ` · Ref. cobro: ${factura.referencia_cobro}` : ''}`,
       actor_id: user.id,
     }),
   ]);

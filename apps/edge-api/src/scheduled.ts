@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import { processGeocodingQueue } from './services/geocoding';
+import { checkWorkloadAlerts } from './services/workload-alerts';
 import type { Env } from './types';
 
 export async function runScheduledTasks(env: Env): Promise<Record<string, any>> {
@@ -15,6 +17,10 @@ export async function runScheduledTasks(env: Env): Promise<Record<string, any>> 
   results.pedidos_caducados = await detectPedidosCaducados(supabase);
   results.facturas_vencidas = await detectFacturasVencidas(supabase);
   results.informes_caducados = await detectInformesCaducados(supabase);
+  results.geocoding_queue   = await processGeocodingQueue(supabase, 15);
+  results.geo_overload      = await detectGeoOverloads(supabase);
+  results.workload_alerts   = await checkWorkloadAlerts(supabase);
+  results.autocita_expirados = await detectAutocitaTokensExpirados(supabase);
 
   return results;
 }
@@ -146,4 +152,88 @@ async function detectInformesCaducados(supabase: any) {
     .from('v_informes_caducados')
     .select('*', { count: 'exact', head: true });
   return { count: count ?? 0 };
+}
+
+/** Detecta operarios con sobrecarga (>6 citas el mismo día) y genera alertas */
+async function detectGeoOverloads(supabase: any) {
+  const { data: sobrecargados } = await supabase
+    .from('v_operario_carga')
+    .select('id, nombre, apellidos, citas_hoy')
+    .gt('citas_hoy', 6);
+
+  let count = 0;
+  for (const op of sobrecargados ?? []) {
+    await supabase.from('alertas').upsert({
+      tipo: 'geo_operario_sobrecarga',
+      titulo: `Operario sobrecargado: ${op.nombre} ${op.apellidos} (${op.citas_hoy} citas hoy)`,
+      prioridad: 'alta',
+      estado: 'activa',
+    }, { onConflict: 'tipo,titulo' });
+    count++;
+  }
+
+  return { overloaded: count };
+}
+
+/**
+ * Detecta tokens de autocita que han expirado sin acción del cliente y genera
+ * una alerta para la oficina por cada uno. Marca los tokens como 'expirado'.
+ */
+async function detectAutocitaTokensExpirados(supabase: any) {
+  const now = new Date().toISOString();
+
+  // Tokens pendientes cuya fecha de expiración ya pasó
+  const { data: tokensCaducados } = await supabase
+    .from('autocita_tokens')
+    .select('id, expediente_id, created_by')
+    .eq('estado', 'pendiente')
+    .lt('expires_at', now)
+    .is('revoked_at', null);
+
+  let count = 0;
+  for (const tok of tokensCaducados ?? []) {
+    // Check if client took any action (any seleccion with non-view accion)
+    const { data: selecciones } = await supabase
+      .from('autocita_selecciones')
+      .select('id')
+      .eq('token_id', tok.id)
+      .not('accion', 'eq', 'confirmacion_propuesta')
+      .limit(1);
+
+    const sinAccion = !selecciones || selecciones.length === 0;
+
+    // Mark as expired
+    await supabase
+      .from('autocita_tokens')
+      .update({ estado: 'expirado' })
+      .eq('id', tok.id);
+
+    if (sinAccion) {
+      // Alert for office
+      await supabase.from('alertas').upsert({
+        tipo: 'custom',
+        titulo: 'Enlace de autocita expirado sin respuesta',
+        mensaje: 'El cliente no respondió al enlace de autocita antes de que caducara.',
+        expediente_id: tok.expediente_id,
+        prioridad: 'baja',
+        estado: 'activa',
+        destinatario_id: null,
+      }, { onConflict: 'tipo,expediente_id' });
+
+      // Domain event
+      await supabase.from('eventos_dominio').insert({
+        aggregate_id: tok.expediente_id,
+        aggregate_type: 'expediente',
+        event_type: 'AutocitaTokenExpirado',
+        payload: { token_id: tok.id, expediente_id: tok.expediente_id },
+        actor_id: tok.created_by,
+        correlation_id: crypto.randomUUID(),
+        causation_id: null,
+      });
+
+      count++;
+    }
+  }
+
+  return { expirados_sin_accion: count };
 }

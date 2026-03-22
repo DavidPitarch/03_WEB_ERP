@@ -44,6 +44,8 @@ export interface Expediente {
   asegurado_id: string;
   operario_id: string | null;
   perito_id: string | null;
+  tramitador_id: string | null;
+  fecha_asignacion_tramitador: string | null;
   numero_poliza: string | null;
   numero_siniestro_cia: string | null;
   tipo_siniestro: string;
@@ -225,9 +227,125 @@ export const DOMAIN_EVENT_TYPES = [
   'VideoperitacionReprogramada',
   'VideoperitacionCancelada',
   'LinkVideoperitacionEnviado',
+  'AutocitaTokenEmitido',
+  'AutocitaCitaConfirmada',
+  'AutocitaCambioSolicitado',
+  'AutocitaSlotSeleccionado',
+  'AutocitaSlotNoDisponible',
+  'AutocitaLimiteCambiosAlcanzado',
+  'AutocitaTokenExpirado',
+  // EP-12 Customer Tracking
+  'CustomerTrackingLinkEmitido',
+  'CustomerTrackingLinkRevocado',
+  'CustomerTrackingEmailEnviado',
 ] as const;
 
 export type DomainEventType = (typeof DOMAIN_EVENT_TYPES)[number];
+
+// ─── Geo Planning ───
+
+export type GeoStatus = 'pending' | 'ok' | 'failed' | 'manual';
+export type SlaStatus = 'ok' | 'urgente' | 'vencido' | 'sin_sla';
+
+/** Expediente enriquecido para el mapa (view v_geo_expedientes) */
+export interface GeoExpediente {
+  id: string;
+  numero_expediente: string;
+  estado: ExpedienteEstado;
+  prioridad: 'baja' | 'media' | 'alta' | 'urgente';
+  fecha_encargo: string;
+  fecha_limite_sla: string | null;
+  operario_id: string | null;
+  operario_nombre: string | null;
+  compania_id: string;
+  compania_nombre: string | null;
+  tipo_siniestro: string;
+  direccion_siniestro: string;
+  codigo_postal: string;
+  localidad: string;
+  provincia: string;
+  lat: number;
+  lng: number;
+  geo_status: GeoStatus;
+  sla_status: SlaStatus;
+  citas_hoy: number;
+}
+
+/** Operario enriquecido con carga del día para el mapa (view v_operario_carga) */
+export interface GeoOperario {
+  id: string;
+  nombre: string;
+  apellidos: string;
+  telefono: string;
+  email: string;
+  gremios: string[];
+  zonas_cp: string[];
+  activo: boolean;
+  base_lat: number | null;
+  base_lng: number | null;
+  citas_hoy: number;
+  citas_semana: number;
+  ultima_cita_fecha: string | null;
+  overloaded: boolean;
+  carga_pct: number;
+}
+
+/** Punto para el mapa de calor */
+export interface HeatPoint {
+  cp: string;
+  lat: number;
+  lng: number;
+  count: number;
+  urgentes: number;
+  intensity: number;
+}
+
+/** Sugerencia del Smart Dispatch */
+export interface DispatchSuggestion {
+  expediente_id: string;
+  expediente_num: string;
+  expediente_dir: string;
+  operario_id: string;
+  operario_nombre: string;
+  distance_km: number;
+  score: number;
+  citas_hoy: number;
+  conflicts: string[];
+  reason: string;
+}
+
+/** Filtros activos del mapa */
+export interface GeoMapFilters {
+  estado: string[];
+  prioridad: string[];
+  operario_id: string;
+  compania_id: string;
+  gremio: string;
+  fecha_ini: string;
+  fecha_fin: string;
+  solo_sin_asignar: boolean;
+  solo_urgentes: boolean;
+}
+
+/** Posición en tiempo real de un operario */
+export interface OperarioPosition {
+  operario_id: string;
+  lat: number;
+  lng: number;
+  accuracy_m: number | null;
+  recorded_at: string;
+}
+
+// ─── Eventos de dominio geo ───
+export const GEO_EVENT_TYPES = [
+  'GeoExpedienteGeocodificado',
+  'GeoAsignacionCreada',
+  'GeoAsignacionRechazada',
+  'GeoSobrecargaDetectada',
+  'GeoPosicionActualizada',
+] as const;
+
+export type GeoEventType = (typeof GEO_EVENT_TYPES)[number];
 
 // ─── API contracts ───
 export interface ApiResponse<T> {
@@ -604,7 +722,7 @@ export interface LineaPresupuesto {
   created_at: string;
 }
 
-export interface SlaStatus {
+export interface SlaCalcResult {
   fecha_limite: string | null;
   tiempo_total_ms: number;
   tiempo_suspendido_ms: number;
@@ -624,6 +742,58 @@ export type EstadoCobro = (typeof ESTADO_COBRO)[number];
 export const CANAL_ENVIO = ['email', 'api', 'portal', 'manual'] as const;
 export type CanalEnvio = (typeof CANAL_ENVIO)[number];
 
+// ─── Ep-13: Config. emisión ───
+
+export const TIPO_DOCUMENTO_SERIE = [
+  'factura', 'factura_simplificada', 'autofactura', 'abono', 'rectificativa',
+] as const;
+export type TipoDocumentoSerie = (typeof TIPO_DOCUMENTO_SERIE)[number];
+
+export const TIPO_TERCERO_SERIE = [
+  'compania', 'cliente_final', 'operario_autonomo', 'proveedor', 'grupo_empresa', 'cualquiera',
+] as const;
+export type TipoTerceroSerie = (typeof TIPO_TERCERO_SERIE)[number];
+
+export const FLUJO_ORIGEN_SERIE = [
+  'expediente', 'videoperitacion', 'manual', 'subcontrata', 'cualquiera',
+] as const;
+export type FlujoOrigenSerie = (typeof FLUJO_ORIGEN_SERIE)[number];
+
+export const SISTEMA_FISCAL = ['ninguno', 'ticketbai', 'facturae', 'verifactu'] as const;
+export type SistemaFiscal = (typeof SISTEMA_FISCAL)[number];
+
+export interface ReglaNumeracion {
+  id: string;
+  empresa_facturadora_id: string | null;
+  nombre: string;
+  descripcion: string | null;
+  separador_prefijo: string;
+  separador_anio: string;
+  incluir_anio: boolean;
+  formato_anio: 'YYYY' | 'YY';
+  longitud_contador: number;
+  reset_anual: boolean;
+  activa: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CuentaBancariaEmpresa {
+  id: string;
+  empresa_facturadora_id: string;
+  iban: string;
+  bic_swift: string | null;
+  nombre_banco: string;
+  titular: string;
+  moneda: string;
+  es_principal: boolean;
+  activa: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SerieFacturacion {
   id: string;
   codigo: string;
@@ -631,9 +801,115 @@ export interface SerieFacturacion {
   prefijo: string;
   empresa_facturadora_id: string;
   tipo: 'ordinaria' | 'rectificativa' | 'abono';
+  tipo_documento: TipoDocumentoSerie;
+  tipo_tercero: TipoTerceroSerie;
+  flujo_origen: FlujoOrigenSerie;
+  regla_numeracion_id: string | null;
+  cuenta_bancaria_id: string | null;
+  forma_pago_default: string | null;
+  vigencia_desde: string | null;
+  vigencia_hasta: string | null;
+  ejercicio_fiscal: string | null;
   contador_actual: number;
   activa: boolean;
+  version: number;
+  notas: string | null;
+  created_by: string | null;
+  updated_by: string | null;
   created_at: string;
+  updated_at: string;
+  regla_numeracion?: ReglaNumeracion;
+  cuenta_bancaria?: CuentaBancariaEmpresa;
+}
+
+export interface AsignacionSerie {
+  id: string;
+  empresa_facturadora_id: string;
+  serie_id: string;
+  tipo_documento: TipoDocumentoSerie;
+  tipo_tercero: Exclude<TipoTerceroSerie, 'cualquiera'> | null;
+  flujo_origen: Exclude<FlujoOrigenSerie, 'cualquiera'> | null;
+  compania_id: string | null;
+  prioridad: number;
+  activa: boolean;
+  notas: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  serie?: Pick<SerieFacturacion, 'id' | 'codigo' | 'nombre' | 'prefijo'>;
+  compania?: { id: string; nombre: string } | null;
+}
+
+export interface ConfigEmisionEmpresa {
+  id: string;
+  empresa_facturadora_id: string;
+  generar_pdf: boolean;
+  firma_digital: boolean;
+  sistema_fiscal: SistemaFiscal;
+  envio_automatico: boolean;
+  canal_envio_default: CanalEnvio;
+  email_remitente: string | null;
+  cc_contabilidad: string | null;
+  dias_vencimiento: number;
+  iva_porcentaje_default: number;
+  recargo_equivalencia: number;
+  cuenta_bancaria_id: string | null;
+  plantilla_pdf: string;
+  logo_storage_path: string | null;
+  pie_factura: string | null;
+  notas_legales: string | null;
+  abono_referencia_obligatoria: boolean;
+  autofactura_requiere_aceptacion: boolean;
+  version: number;
+  updated_by: string | null;
+  updated_at: string;
+  cuenta_bancaria?: CuentaBancariaEmpresa;
+}
+
+export interface SerieHistorialEntry {
+  id: string;
+  serie_id: string;
+  version_numero: number;
+  datos_anteriores: Partial<SerieFacturacion>;
+  datos_nuevos: Partial<SerieFacturacion>;
+  motivo_cambio: string | null;
+  actor_id: string | null;
+  created_at: string;
+}
+
+export interface CreateSerieRequest {
+  codigo: string;
+  nombre: string;
+  prefijo: string;
+  empresa_facturadora_id: string;
+  tipo_documento: TipoDocumentoSerie;
+  tipo_tercero?: TipoTerceroSerie;
+  flujo_origen?: FlujoOrigenSerie;
+  regla_numeracion_id?: string;
+  cuenta_bancaria_id?: string;
+  forma_pago_default?: string;
+  vigencia_desde?: string;
+  vigencia_hasta?: string;
+  ejercicio_fiscal?: string;
+  notas?: string;
+}
+
+export interface UpdateSerieRequest extends Partial<CreateSerieRequest> {
+  version: number;
+  motivo_cambio?: string;
+}
+
+export interface ResolverSerieRequest {
+  empresa_facturadora_id: string;
+  tipo_documento: TipoDocumentoSerie;
+  tipo_tercero?: TipoTerceroSerie;
+  flujo_origen?: FlujoOrigenSerie;
+  compania_id?: string;
+}
+
+export interface ResolverSerieResult {
+  serie: SerieFacturacion | null;
+  asignacion_id?: string;
 }
 
 export interface Factura {
@@ -1432,8 +1708,14 @@ export interface CustomerTrackingIssueLinkResponse {
   expediente_id: string;
   token: string;
   path: string;
+  /** URL completa del portal cliente, construida con CONFIRM_BASE_URL. */
+  tracking_url: string;
   expires_at: string;
   revoked_previous_count: number;
+  /** true si el email se intentó y fue aceptado (incluye dry_run). */
+  email_sent: boolean;
+  /** Estado del intento de envío. no_email = el asegurado no tiene email. */
+  email_status: 'sent' | 'dry_run' | 'failed' | 'no_email';
 }
 
 export interface CustomerTrackingConfirmCitaResponse {
@@ -1497,4 +1779,419 @@ export interface CustomerTrackingView {
   } | null;
   contacto: CustomerTrackingContact | null;
   timeline: CustomerTrackingTimelineItem[];
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MÓDULO: CALENDARIO OPERATIVO
+// ═══════════════════════════════════════════════════════════════
+
+export type CalAmbito =
+  | 'nacional'
+  | 'autonomico'
+  | 'provincial'
+  | 'local'
+  | 'empresa';
+
+export type CalAusenciaTipo =
+  | 'vacacion'
+  | 'baja_medica'
+  | 'baja_laboral'
+  | 'asunto_personal'
+  | 'permiso_retribuido'
+  | 'bloqueo';
+
+export type CalAusenciaEstado =
+  | 'solicitada'
+  | 'aprobada'
+  | 'rechazada'
+  | 'cancelada';
+
+export type CalGuardiaTipo =
+  | 'guardia'
+  | 'reten'
+  | 'turno_especial'
+  | 'disponibilidad_ampliada';
+
+export type CalExcepcionTipo =
+  | 'cita_en_festivo'
+  | 'cita_en_ausencia'
+  | 'fuera_horario'
+  | 'cita_en_bloqueo';
+
+export type CalTipoEvento = 'festivo' | 'ausencia' | 'guardia';
+
+// ─── Entidades ───────────────────────────────────────────────────────────────
+
+export interface CalFestivo {
+  id: string;
+  fecha: string;                   // YYYY-MM-DD
+  nombre: string;
+  ambito: CalAmbito;
+  comunidad_autonoma?: string | null;
+  provincia?: string | null;
+  municipio?: string | null;
+  empresa_id?: string | null;
+  activo: boolean;
+  created_by?: string | null;
+  created_at: string;
+}
+
+export interface CalAusencia {
+  id: string;
+  operario_id: string;
+  tipo: CalAusenciaTipo;
+  fecha_inicio: string;            // YYYY-MM-DD
+  fecha_fin: string;               // YYYY-MM-DD
+  motivo?: string | null;
+  estado: CalAusenciaEstado;
+  aprobada_por?: string | null;
+  aprobada_at?: string | null;
+  motivo_rechazo?: string | null;
+  citas_afectadas_count: number;
+  sla_pausado: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  // join
+  operarios?: { nombre: string; apellidos: string } | null;
+}
+
+export interface CalGuardia {
+  id: string;
+  operario_id: string;
+  tipo: CalGuardiaTipo;
+  fecha_inicio: string;            // ISO timestamp
+  fecha_fin: string;               // ISO timestamp
+  zona_cp?: string[] | null;
+  especialidades?: string[] | null;
+  observaciones?: string | null;
+  activa: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  // join
+  operarios?: { nombre: string; apellidos: string } | null;
+}
+
+export interface CalReglaDisponibilidad {
+  id: string;
+  empresa_id?: string | null;
+  zona_cp?: string | null;
+  especialidad?: string | null;
+  dias_semana: number[];           // 0=domingo, 1=lunes … 6=sábado
+  hora_inicio: string;             // HH:MM
+  hora_fin: string;                // HH:MM
+  vigente_desde: string;           // YYYY-MM-DD
+  vigente_hasta?: string | null;   // YYYY-MM-DD
+  activa: boolean;
+  descripcion?: string | null;
+  created_by?: string | null;
+  created_at: string;
+}
+
+export interface CalExcepcion {
+  id: string;
+  tipo_excepcion: CalExcepcionTipo;
+  referencia_id?: string | null;
+  referencia_tabla?: string | null;
+  justificacion: string;
+  aprobada_por?: string | null;
+  aprobada_at?: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+// ─── Resultado de disponibilidad ────────────────────────────────────────────
+
+export interface DisponibilidadBloqueMotivo {
+  tipo: 'festivo' | 'ausencia' | 'fuera_horario' | 'guardia_otro';
+  descripcion: string;
+  referencia_id?: string | null;
+}
+
+export interface DisponibilidadCheck {
+  disponible: boolean;
+  motivos_bloqueo: DisponibilidadBloqueMotivo[];
+  tiene_guardia: boolean;
+  ausencia_activa?: CalAusencia | null;
+}
+
+// ─── Evento unificado (vista v_calendario_operativo) ────────────────────────
+
+export interface CalEventoUnificado {
+  tipo_evento: CalTipoEvento;
+  id: string;
+  operario_id: string | null;
+  fecha_inicio: string;
+  fecha_fin: string;
+  titulo: string;
+  subtipo: string;
+  empresa_id: string | null;
+  metadata: Record<string, unknown>;
+}
+
+// ─── Requests ────────────────────────────────────────────────────────────────
+
+export interface CreateCalFestivoRequest {
+  fecha: string;
+  nombre: string;
+  ambito: CalAmbito;
+  comunidad_autonoma?: string;
+  provincia?: string;
+  municipio?: string;
+  empresa_id?: string;
+}
+
+export interface CreateCalAusenciaRequest {
+  operario_id: string;
+  tipo: CalAusenciaTipo;
+  fecha_inicio: string;
+  fecha_fin: string;
+  motivo?: string;
+}
+
+export interface UpdateCalAusenciaRequest {
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  motivo?: string;
+  estado?: CalAusenciaEstado;
+}
+
+export interface CreateCalGuardiaRequest {
+  operario_id: string;
+  tipo: CalGuardiaTipo;
+  fecha_inicio: string;
+  fecha_fin: string;
+  zona_cp?: string[];
+  especialidades?: string[];
+  observaciones?: string;
+}
+
+export interface CreateCalReglaRequest {
+  empresa_id?: string;
+  zona_cp?: string;
+  especialidad?: string;
+  dias_semana?: number[];
+  hora_inicio?: string;
+  hora_fin?: string;
+  vigente_desde?: string;
+  vigente_hasta?: string;
+  descripcion?: string;
+}
+
+export interface AprobarAusenciaRequest {
+  ausencia_id: string;
+}
+
+export interface RechazarAusenciaRequest {
+  ausencia_id: string;
+  motivo_rechazo: string;
+}
+
+// ─── MÓDULO AUTOCITA ────────────────────────────────────────────────────────
+
+export type AutocitaTokenScope = 'confirmar' | 'seleccionar' | 'ambos';
+export type AutocitaTokenEstado = 'pendiente' | 'usado' | 'expirado' | 'revocado';
+export type AutocitaAccion = 'confirmacion_propuesta' | 'seleccion_hueco' | 'cambio_solicitado' | 'slot_no_disponible';
+
+export interface AutocitaSlot {
+  id: string;
+  operario_id: string;
+  fecha: string;
+  franja_inicio: string;
+  franja_fin: string;
+  alerta_sla: boolean;
+}
+
+export interface AutocitaConfig {
+  max_slots_mostrados: number;
+  dias_max_seleccion: number;
+  margen_aviso_h: number;
+  buffer_sla_h: number;
+  permite_seleccion_libre: boolean;
+  max_cambios_por_expediente: number;
+}
+
+export interface AutocitaView {
+  expediente: {
+    numero_expediente: string;
+    estado_label: string;
+    tipo_siniestro: string;
+  };
+  cita_propuesta: {
+    cita_id: string;
+    fecha: string;
+    franja_inicio: string;
+    franja_fin: string;
+    estado: string;
+    tecnico: string | null;
+    can_confirm: boolean;
+    can_request_change: boolean;
+    cambios_restantes: number;
+  } | null;
+  sla: {
+    estado: string;
+    fecha_limite: string | null;
+  } | null;
+  scope: AutocitaTokenScope;
+}
+
+// ─── Autocita — API requests / responses ────────────────────────────────────
+
+export interface AutocitaIssueLinkRequest {
+  expediente_id: string;
+  scope?: AutocitaTokenScope;
+  ttl_hours?: number;
+  max_uses?: number;
+}
+
+export interface AutocitaIssueLinkResponse {
+  expediente_id: string;
+  token: string;
+  path: string;
+  scope: AutocitaTokenScope;
+  expires_at: string;
+}
+
+export interface AutocitaSlotsResponse {
+  slots: AutocitaSlot[];
+  total: number;
+  cambios_restantes: number;
+  mensaje_sin_huecos: string | null;
+}
+
+export interface AutocitaConfirmarResponse {
+  cita_id: string;
+  confirmada: boolean;
+  confirmed_at: string;
+}
+
+export interface AutocitaSeleccionarRequest {
+  slot_id: string;
+}
+
+export interface AutocitaSeleccionarResponse {
+  cita_id: string;
+  nueva_fecha: string;
+  nueva_franja_inicio: string;
+  nueva_franja_fin: string;
+  confirmacion_automatica: boolean;
+}
+
+// ─── UCT: Usuarios y Cargas de Trabajo ───
+
+export type TramitadorNivel = 'junior' | 'senior' | 'especialista' | 'supervisor';
+export type TramitadorSemaforo = 'verde' | 'amarillo' | 'rojo';
+export type HistorialAsignacionTipo =
+  | 'asignacion_inicial'
+  | 'reasignacion_manual'
+  | 'reasignacion_automatica'
+  | 'reasignacion_masiva'
+  | 'desasignacion';
+export type ReglaRepartoTipo = 'manual' | 'round_robin' | 'weighted' | 'rule_based' | 'sla_priority';
+export type AlertaCargaTipo = 'umbral_carga' | 'carga_maxima' | 'sla_vencidos' | 'sin_tramitador' | 'expedientes_bloqueados';
+export type AlertaSeveridad = 'info' | 'warning' | 'critical';
+
+export interface Tramitador {
+  id: string;
+  user_id: string;
+  empresa_facturadora_id: string | null;
+  nombre: string;
+  apellidos: string;
+  email: string;
+  telefono: string | null;
+  nivel: TramitadorNivel;
+  max_expedientes_activos: number;
+  max_urgentes: number;
+  max_por_compania: number | null;
+  umbral_alerta_pct: number;
+  especialidades_siniestro: string[];
+  companias_preferentes: string[];
+  zonas_cp: string[];
+  activo: boolean;
+  fecha_alta: string;
+  fecha_baja: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CargaTramitador {
+  tramitador_id: string;
+  nombre_completo: string;
+  nombre: string;
+  apellidos: string;
+  empresa_facturadora_id: string | null;
+  activo: boolean;
+  nivel: TramitadorNivel;
+  max_expedientes_activos: number;
+  max_urgentes: number;
+  umbral_alerta_pct: number;
+  total_activos: number;
+  total_urgentes: number;
+  total_sla_vencidos: number;
+  total_sin_cita: number;
+  total_bloqueados: number;
+  porcentaje_carga: number;
+  semaforo: TramitadorSemaforo;
+  last_refresh: string;
+}
+
+export interface HistorialAsignacion {
+  id: string;
+  expediente_id: string;
+  tramitador_anterior_id: string | null;
+  tramitador_nuevo_id: string | null;
+  tipo: HistorialAsignacionTipo;
+  motivo: string | null;
+  motivo_codigo: string | null;
+  actor_id: string | null;
+  actor_tipo: 'usuario' | 'sistema';
+  batch_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface ReglaReparto {
+  id: string;
+  empresa_facturadora_id: string | null;
+  nombre: string;
+  descripcion: string | null;
+  tipo: ReglaRepartoTipo;
+  activa: boolean;
+  prioridad_orden: number;
+  config: Record<string, unknown>;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AlertaCarga {
+  id: string;
+  tramitador_id: string | null;
+  tipo: AlertaCargaTipo;
+  severidad: AlertaSeveridad;
+  mensaje: string;
+  valor_umbral: number | null;
+  valor_actual: number | null;
+  resuelta: boolean;
+  resuelta_at: string | null;
+  resuelta_por: string | null;
+  created_at: string;
+}
+
+export interface TramitadorReglaPreasignacion {
+  id: string;
+  tramitador_id: string;
+  empresa_facturadora_id: string | null;
+  compania_id: string | null;
+  tipo_siniestro: string | null;
+  zona_cp_patron: string | null;
+  prioridad: string | null;
+  peso: number;
+  activa: boolean;
+  descripcion: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 }

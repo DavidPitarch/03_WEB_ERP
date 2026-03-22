@@ -3,7 +3,7 @@ import { enqueue } from './offline-queue';
 import type { ApiResult } from '@erp/types';
 import { getDemoAgenda, getDemoClaimDetail } from './demo-data';
 
-const API_BASE = '/api/v1/operator';
+const API_BASE = `${import.meta.env.VITE_API_URL ?? ''}/api/v1/operator`;
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
 async function demoRequest<T>(path: string, options: RequestInit = {}): Promise<ApiResult<T>> {

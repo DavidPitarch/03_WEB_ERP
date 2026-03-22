@@ -1,0 +1,49 @@
+name: Deploy operator-pwa
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/operator-pwa/**'
+      - 'packages/**'
+
+# Only one deploy at a time
+concurrency:
+  group: deploy-operator
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Cloudflare Pages (production)
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.5.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        working-directory: apps/operator-pwa
+        run: pnpm build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_API_URL: https://erp-siniestros-api.david-pitarch.workers.dev
+
+      - name: Deploy to Cloudflare Pages
+        working-directory: apps/operator-pwa
+        run: pnpm exec wrangler pages deploy dist --project-name erp-operario --branch main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

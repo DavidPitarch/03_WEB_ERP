@@ -18,8 +18,9 @@ ENVIRONMENT = "development"
 # dead_letter_queue = "domain-events-dlq"
 
 # Cron Triggers (watchdogs) — 7:00 y 13:00 UTC
-[triggers]
-crons = ["0 7 * * *", "0 13 * * *"]
+# Solo se activan en demo y production (ver más abajo)
+# [triggers]
+# crons = ["0 7 * * *", "0 13 * * *"]
 
 
 # ─── Entorno demo ─────────────────────────────────────────────────────────────

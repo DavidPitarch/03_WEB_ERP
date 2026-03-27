@@ -680,11 +680,7 @@ CREATE POLICY "parties_operario_select" ON parties
     get_my_role() = 'operario'
     AND EXISTS (
       SELECT 1 FROM expediente_participants ep
-      JOIN visitas v ON v.expediente_id = ep.expediente_id
       WHERE ep.party_id = parties.id
-        AND v.operario_id IN (
-          SELECT o.id FROM operarios o WHERE o.user_id = auth.uid()
-        )
     )
   );
 

@@ -2080,7 +2080,7 @@ export interface AutocitaSeleccionarResponse {
 
 // ─── UCT: Usuarios y Cargas de Trabajo ───
 
-export type TramitadorNivel = 'junior' | 'senior' | 'especialista' | 'supervisor';
+export type TramitadorNivel = 'tramitador' | 'facturacion' | 'redes' | 'administrador' | 'super_administrador';
 export type TramitadorSemaforo = 'verde' | 'amarillo' | 'rojo';
 export type HistorialAsignacionTipo =
   | 'asignacion_inicial'

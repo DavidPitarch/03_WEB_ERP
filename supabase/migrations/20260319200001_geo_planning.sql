@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS geo_cache (
 
 ALTER TABLE geo_cache ENABLE ROW LEVEL SECURITY;
 
+DO $$ BEGIN DROP POLICY IF EXISTS "geo_cache_read_authenticated" ON geo_cache; EXCEPTION WHEN OTHERS THEN NULL; END $$;
 CREATE POLICY "geo_cache_read_authenticated"
   ON geo_cache FOR SELECT TO authenticated USING (true);
 
@@ -66,6 +67,7 @@ ALTER TABLE operario_positions ENABLE ROW LEVEL SECURITY;
 
 -- Operario solo ve/inserta su propia posición;
 -- admin y supervisor ven todas.
+DO $$ BEGIN DROP POLICY IF EXISTS "op_positions_own_or_admin" ON operario_positions; EXCEPTION WHEN OTHERS THEN NULL; END $$;
 CREATE POLICY "op_positions_own_or_admin"
   ON operario_positions FOR ALL TO authenticated
   USING (
@@ -73,9 +75,10 @@ CREATE POLICY "op_positions_own_or_admin"
       SELECT id FROM operarios WHERE user_id = auth.uid()
     )
     OR EXISTS (
-      SELECT 1 FROM user_profiles
-      WHERE user_id = auth.uid()
-        AND role IN ('admin', 'supervisor')
+      SELECT 1 FROM user_roles ur
+      JOIN roles r ON r.id = ur.role_id
+      WHERE ur.user_id = auth.uid()
+        AND r.nombre IN ('admin', 'supervisor', 'Administrador', 'Super Administración')
     )
   )
   WITH CHECK (

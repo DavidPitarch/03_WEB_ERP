@@ -355,6 +355,7 @@ ORDER BY mb.fecha_operacion DESC;
 -- ============================================================================
 -- 16. Actualizar v_facturas_listado para incluir referencia de cobro
 -- ============================================================================
+DROP VIEW IF EXISTS v_facturas_listado;
 CREATE OR REPLACE VIEW v_facturas_listado AS
 SELECT
   f.*,

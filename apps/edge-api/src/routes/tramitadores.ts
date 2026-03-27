@@ -3,7 +3,7 @@ import type { Env } from '../types';
 
 export const tramitadoresRoutes = new Hono<{ Bindings: Env }>();
 
-// GET /tramitadores — lista con carga actual
+// GET /tramitadores — lista con carga actual + roles (Permisos)
 tramitadoresRoutes.get('/', async (c) => {
   const supabase = c.get('supabase');
   const empresaId = c.req.query('empresa_facturadora_id');
@@ -20,7 +20,29 @@ tramitadoresRoutes.get('/', async (c) => {
   const { data, error } = await query;
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  return c.json({ data, error: null });
+  const lista = data ?? [];
+
+  // Batch-fetch roles de todos los tramitadores
+  const userIds = lista.map((t: any) => t.user_id).filter(Boolean);
+  let rolesPorUser: Record<string, string[]> = {};
+  if (userIds.length > 0) {
+    const { data: urData } = await supabase
+      .from('user_roles')
+      .select('user_id, roles(nombre)')
+      .in('user_id', userIds);
+    for (const ur of urData ?? []) {
+      if (!rolesPorUser[ur.user_id]) rolesPorUser[ur.user_id] = [];
+      const nombre = (ur.roles as any)?.nombre;
+      if (nombre) rolesPorUser[ur.user_id].push(nombre);
+    }
+  }
+
+  const result = lista.map((t: any) => ({
+    ...t,
+    permisos: rolesPorUser[t.user_id] ?? [],
+  }));
+
+  return c.json({ data: result, error: null });
 });
 
 // GET /tramitadores/dashboard — KPIs agregados
@@ -84,29 +106,51 @@ tramitadoresRoutes.get('/:id', async (c) => {
   return c.json({ data: { ...tramitador, carga: carga ?? null }, error: null });
 });
 
-// POST /tramitadores — crear tramitador
+// POST /tramitadores — crear tramitador (el user_id se genera automáticamente mediante invitación)
 tramitadoresRoutes.post('/', async (c) => {
   const supabase = c.get('supabase');
+  const adminSupabase = c.get('adminSupabase');
   const user = c.get('user');
   const body = await c.req.json<any>();
 
-  const required = ['user_id', 'nombre', 'apellidos', 'email'];
+  const required = ['nombre', 'apellidos', 'email'];
   for (const field of required) {
     if (!body[field]) {
       return c.json({ data: null, error: { code: 'VALIDATION', message: `${field} es requerido` } }, 422);
     }
   }
 
+  // Crear usuario en Supabase Auth y enviar email de invitación
+  const { data: authData, error: authError } = await adminSupabase.auth.admin.inviteUserByEmail(
+    body.email,
+    {
+      data: { nombre: body.nombre, apellidos: body.apellidos },
+      ...(c.env.CONFIRM_BASE_URL
+        ? { redirectTo: `${c.env.CONFIRM_BASE_URL}/auth/set-password` }
+        : {}),
+    },
+  );
+
+  if (authError) {
+    // Si el usuario ya existe en auth, intentar obtener su UUID
+    if (authError.message?.toLowerCase().includes('already registered') || authError.status === 422) {
+      return c.json({ data: null, error: { code: 'AUTH_DUPLICATE', message: 'Ya existe un usuario de autenticación con ese email. Comprueba si ya está dado de alta como tramitador.' } }, 409);
+    }
+    return c.json({ data: null, error: { code: 'AUTH_ERROR', message: authError.message } }, 500);
+  }
+
+  const user_id = authData.user.id;
+
   const { data, error } = await supabase
     .from('tramitadores')
     .insert({
-      user_id:                 body.user_id,
+      user_id,
       empresa_facturadora_id:  body.empresa_facturadora_id ?? null,
       nombre:                  body.nombre,
       apellidos:               body.apellidos,
       email:                   body.email,
       telefono:                body.telefono ?? null,
-      nivel:                   body.nivel ?? 'junior',
+      nivel:                   body.nivel ?? 'tramitador',
       max_expedientes_activos: body.max_expedientes_activos ?? 30,
       max_urgentes:            body.max_urgentes ?? 5,
       umbral_alerta_pct:       body.umbral_alerta_pct ?? 90,
@@ -118,6 +162,8 @@ tramitadoresRoutes.post('/', async (c) => {
     .single();
 
   if (error) {
+    // Revertir la creación del usuario en Auth si el insert falla
+    await adminSupabase.auth.admin.deleteUser(user_id);
     if (error.code === '23505') {
       return c.json({ data: null, error: { code: 'DUPLICATE', message: 'Ya existe un tramitador con ese usuario' } }, 409);
     }
@@ -126,10 +172,40 @@ tramitadoresRoutes.post('/', async (c) => {
 
   await supabase.from('auditoria').insert({
     tabla: 'tramitadores', registro_id: data.id, accion: 'INSERT', actor_id: user.id,
-    cambios: jsonBody(body),
+    cambios: jsonBody({ ...body, user_id }),
   });
 
   return c.json({ data, error: null }, 201);
+});
+
+// PATCH /tramitadores/:id/ausente — marcar/desmarcar ausencia
+tramitadoresRoutes.patch('/:id/ausente', async (c) => {
+  const supabase = c.get('supabase');
+  const user = c.get('user');
+  const id = c.req.param('id');
+  const { ausente } = await c.req.json<{ ausente: boolean }>();
+
+  if (typeof ausente !== 'boolean') {
+    return c.json({ data: null, error: { code: 'VALIDATION', message: 'ausente debe ser boolean' } }, 422);
+  }
+
+  const { data, error } = await supabase
+    .from('tramitadores')
+    .update({ ausente })
+    .eq('id', id)
+    .select('id, nombre, apellidos, ausente')
+    .single();
+
+  if (error || !data) {
+    return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Tramitador no encontrado' } }, 404);
+  }
+
+  await supabase.from('auditoria').insert({
+    tabla: 'tramitadores', registro_id: id, accion: 'UPDATE', actor_id: user.id,
+    cambios: jsonBody({ ausente }),
+  });
+
+  return c.json({ data, error: null });
 });
 
 // PUT /tramitadores/:id — actualizar perfil

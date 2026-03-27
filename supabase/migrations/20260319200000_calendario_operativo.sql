@@ -4,6 +4,8 @@
 --  y su impacto en agenda, SLA y asignaciones.
 -- ═══════════════════════════════════════════════════════════════
 
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
 -- ─── 1. FESTIVOS MULTI-ÁMBITO ────────────────────────────────────────────────
 -- Extiende calendario_laboral con soporte jerárquico:
 -- nacional → autonómico → provincial → local → empresa

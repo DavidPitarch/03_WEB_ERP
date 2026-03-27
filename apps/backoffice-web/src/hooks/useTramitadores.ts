@@ -203,6 +203,22 @@ export function useToggleTramitador() {
   });
 }
 
+export function useToggleAusente() {
+  const qc = useQueryClient();
+  const { session } = useAuth();
+  return useMutation({
+    mutationFn: ({ id, ausente }: { id: string; ausente: boolean }) =>
+      apiFetch(`${API_BASE}/tramitadores/${id}/ausente`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ ausente }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tramitadores'] });
+    },
+  });
+}
+
 export function useAsignarTramitador() {
   const qc = useQueryClient();
   const { session } = useAuth();

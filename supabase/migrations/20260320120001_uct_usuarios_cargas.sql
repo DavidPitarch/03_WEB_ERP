@@ -5,7 +5,7 @@
 
 -- ─── TRAMITADORES ───────────────────────────────────────────
 
-CREATE TABLE tramitadores (
+CREATE TABLE IF NOT EXISTS tramitadores (
   id                         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id                    UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   empresa_facturadora_id     UUID REFERENCES empresas_facturadoras(id) ON DELETE SET NULL,
@@ -36,10 +36,11 @@ CREATE TABLE tramitadores (
   UNIQUE (user_id)
 );
 
-CREATE INDEX idx_tramitadores_user_id    ON tramitadores(user_id);
-CREATE INDEX idx_tramitadores_empresa    ON tramitadores(empresa_facturadora_id);
-CREATE INDEX idx_tramitadores_activo     ON tramitadores(activo) WHERE activo = TRUE;
+CREATE INDEX IF NOT EXISTS idx_tramitadores_user_id    ON tramitadores(user_id);
+CREATE INDEX IF NOT EXISTS idx_tramitadores_empresa    ON tramitadores(empresa_facturadora_id);
+CREATE INDEX IF NOT EXISTS idx_tramitadores_activo     ON tramitadores(activo) WHERE activo = TRUE;
 
+DROP TRIGGER IF EXISTS trg_tramitadores_updated_at ON tramitadores;
 CREATE TRIGGER trg_tramitadores_updated_at
   BEFORE UPDATE ON tramitadores
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
@@ -61,7 +62,7 @@ CREATE INDEX IF NOT EXISTS idx_expedientes_tramitador_estado
 
 -- ─── REGLAS DE PREASIGNACIÓN ────────────────────────────────
 
-CREATE TABLE tramitador_reglas_preasignacion (
+CREATE TABLE IF NOT EXISTS tramitador_reglas_preasignacion (
   id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tramitador_id          UUID NOT NULL REFERENCES tramitadores(id) ON DELETE CASCADE,
   empresa_facturadora_id UUID REFERENCES empresas_facturadoras(id) ON DELETE CASCADE,
@@ -77,18 +78,19 @@ CREATE TABLE tramitador_reglas_preasignacion (
   updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_preasig_tramitador ON tramitador_reglas_preasignacion(tramitador_id, activa);
-CREATE INDEX idx_preasig_compania   ON tramitador_reglas_preasignacion(compania_id)
+CREATE INDEX IF NOT EXISTS idx_preasig_tramitador ON tramitador_reglas_preasignacion(tramitador_id, activa);
+CREATE INDEX IF NOT EXISTS idx_preasig_compania   ON tramitador_reglas_preasignacion(compania_id)
   WHERE compania_id IS NOT NULL;
-CREATE INDEX idx_preasig_empresa    ON tramitador_reglas_preasignacion(empresa_facturadora_id);
+CREATE INDEX IF NOT EXISTS idx_preasig_empresa    ON tramitador_reglas_preasignacion(empresa_facturadora_id);
 
+DROP TRIGGER IF EXISTS trg_preasig_updated_at ON tramitador_reglas_preasignacion;
 CREATE TRIGGER trg_preasig_updated_at
   BEFORE UPDATE ON tramitador_reglas_preasignacion
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- ─── REGLAS DE REPARTO ───────────────────────────────────────
 
-CREATE TABLE reglas_reparto (
+CREATE TABLE IF NOT EXISTS reglas_reparto (
   id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   empresa_facturadora_id UUID REFERENCES empresas_facturadoras(id) ON DELETE CASCADE,
   nombre                 VARCHAR(200) NOT NULL,
@@ -108,13 +110,14 @@ CREATE UNIQUE INDEX idx_reglas_reparto_unica_activa
   ON reglas_reparto(COALESCE(empresa_facturadora_id, '00000000-0000-0000-0000-000000000000'::UUID), activa)
   WHERE activa = TRUE;
 
+DROP TRIGGER IF EXISTS trg_reglas_reparto_updated_at ON reglas_reparto;
 CREATE TRIGGER trg_reglas_reparto_updated_at
   BEFORE UPDATE ON reglas_reparto
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- ─── HISTORIAL DE ASIGNACIONES ──────────────────────────────
 
-CREATE TABLE historial_asignaciones (
+CREATE TABLE IF NOT EXISTS historial_asignaciones (
   id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   expediente_id           UUID NOT NULL REFERENCES expedientes(id) ON DELETE CASCADE,
   tramitador_anterior_id  UUID REFERENCES tramitadores(id) ON DELETE SET NULL,
@@ -136,15 +139,15 @@ CREATE TABLE historial_asignaciones (
   created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_hist_asig_expediente  ON historial_asignaciones(expediente_id, created_at DESC);
-CREATE INDEX idx_hist_asig_nuevo       ON historial_asignaciones(tramitador_nuevo_id, created_at DESC);
-CREATE INDEX idx_hist_asig_anterior    ON historial_asignaciones(tramitador_anterior_id, created_at DESC);
-CREATE INDEX idx_hist_asig_batch       ON historial_asignaciones(batch_id) WHERE batch_id IS NOT NULL;
-CREATE INDEX idx_hist_asig_fecha       ON historial_asignaciones(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_hist_asig_expediente  ON historial_asignaciones(expediente_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_hist_asig_nuevo       ON historial_asignaciones(tramitador_nuevo_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_hist_asig_anterior    ON historial_asignaciones(tramitador_anterior_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_hist_asig_batch       ON historial_asignaciones(batch_id) WHERE batch_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_hist_asig_fecha       ON historial_asignaciones(created_at DESC);
 
 -- ─── ALERTAS DE CARGA ────────────────────────────────────────
 
-CREATE TABLE alertas_carga (
+CREATE TABLE IF NOT EXISTS alertas_carga (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tramitador_id   UUID REFERENCES tramitadores(id) ON DELETE CASCADE,
   tipo            TEXT NOT NULL CHECK (tipo IN (
@@ -165,15 +168,16 @@ CREATE TABLE alertas_carga (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_alertas_carga_activas
+CREATE INDEX IF NOT EXISTS idx_alertas_carga_activas
   ON alertas_carga(tramitador_id, resuelta)
   WHERE resuelta = FALSE;
-CREATE INDEX idx_alertas_carga_tipo
+CREATE INDEX IF NOT EXISTS idx_alertas_carga_tipo
   ON alertas_carga(tipo, resuelta)
   WHERE resuelta = FALSE;
 
 -- ─── VISTA MATERIALIZADA: carga por tramitador ──────────────
 
+DROP MATERIALIZED VIEW IF EXISTS v_carga_tramitadores CASCADE;
 CREATE MATERIALIZED VIEW v_carga_tramitadores AS
 SELECT
   t.id                                              AS tramitador_id,
@@ -207,7 +211,7 @@ SELECT
       )
   )                                                 AS total_sin_cita,
   COUNT(e.id) FILTER (
-    WHERE e.estado LIKE 'PENDIENTE%'
+    WHERE e.estado::TEXT LIKE 'PENDIENTE%'
   )                                                 AS total_bloqueados,
   -- Ratio de carga
   ROUND(
@@ -238,9 +242,9 @@ GROUP BY
   t.id, t.nombre, t.apellidos, t.empresa_facturadora_id,
   t.activo, t.nivel, t.max_expedientes_activos, t.max_urgentes, t.umbral_alerta_pct;
 
-CREATE UNIQUE INDEX idx_v_carga_tramitador ON v_carga_tramitadores(tramitador_id);
-CREATE INDEX idx_v_carga_empresa ON v_carga_tramitadores(empresa_facturadora_id);
-CREATE INDEX idx_v_carga_semaforo ON v_carga_tramitadores(semaforo, activo);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_v_carga_tramitador ON v_carga_tramitadores(tramitador_id);
+CREATE INDEX IF NOT EXISTS idx_v_carga_empresa ON v_carga_tramitadores(empresa_facturadora_id);
+CREATE INDEX IF NOT EXISTS idx_v_carga_semaforo ON v_carga_tramitadores(semaforo, activo);
 
 -- ─── RPC: asignar tramitador a expediente ────────────────────
 

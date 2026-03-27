@@ -35,7 +35,7 @@ tiposSiniestroRoutes.post('/', async (c) => {
     .single();
 
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
-  await insertAudit(supabase, { tabla: 'tipos_siniestro', operacion: 'INSERT', registro_id: data.id, actor_id: user.id, datos_nuevos: data });
+  await insertAudit(supabase, { tabla: 'tipos_siniestro', accion: 'INSERT', registro_id: data.id, actor_id: user.id, cambios: data });
   return c.json({ data, error: null }, 201);
 });
 
@@ -54,7 +54,7 @@ tiposSiniestroRoutes.put('/:id', async (c) => {
 
   const { data, error } = await supabase.from('tipos_siniestro').update(patch).eq('id', id).select('*').single();
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
-  await insertAudit(supabase, { tabla: 'tipos_siniestro', operacion: 'UPDATE', registro_id: id, actor_id: user.id, datos_nuevos: patch });
+  await insertAudit(supabase, { tabla: 'tipos_siniestro', accion: 'UPDATE', registro_id: id, actor_id: user.id, cambios: patch });
   return c.json({ data, error: null });
 });
 
@@ -66,6 +66,6 @@ tiposSiniestroRoutes.delete('/:id', async (c) => {
 
   const { error } = await supabase.from('tipos_siniestro').delete().eq('id', id);
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
-  await insertAudit(supabase, { tabla: 'tipos_siniestro', operacion: 'DELETE', registro_id: id, actor_id: user.id });
+  await insertAudit(supabase, { tabla: 'tipos_siniestro', accion: 'DELETE', registro_id: id, actor_id: user.id });
   return c.json({ data: { deleted: true }, error: null });
 });

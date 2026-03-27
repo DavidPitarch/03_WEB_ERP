@@ -59,7 +59,7 @@ festivosRoutes.post('/', async (c) => {
     return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
   }
 
-  await insertAudit(supabase, { tabla: 'cal_festivos', operacion: 'INSERT', registro_id: data.id ?? data.fecha, actor_id: user.id, datos_nuevos: data });
+  await insertAudit(supabase, { tabla: 'cal_festivos', accion: 'INSERT', registro_id: data.id ?? data.fecha, actor_id: user.id, cambios: data });
   return c.json({ data, error: null }, 201);
 });
 
@@ -71,7 +71,7 @@ festivosRoutes.delete('/:id', async (c) => {
 
   const { error } = await supabase.from('cal_festivos').delete().eq('id', id);
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
-  await insertAudit(supabase, { tabla: 'cal_festivos', operacion: 'DELETE', registro_id: id, actor_id: user.id });
+  await insertAudit(supabase, { tabla: 'cal_festivos', accion: 'DELETE', registro_id: id, actor_id: user.id });
   return c.json({ data: { deleted: true }, error: null });
 });
 
@@ -89,6 +89,6 @@ festivosRoutes.delete('/fecha/:fecha', async (c) => {
     .eq('ambito', ambito);
 
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
-  await insertAudit(supabase, { tabla: 'cal_festivos', operacion: 'DELETE', registro_id: fecha, actor_id: user.id, datos_nuevos: { ambito } });
+  await insertAudit(supabase, { tabla: 'cal_festivos', accion: 'DELETE', registro_id: fecha, actor_id: user.id, cambios: { ambito } });
   return c.json({ data: { deleted: true }, error: null });
 });

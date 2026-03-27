@@ -35,7 +35,7 @@ async function fetchEncuestas(opts: ListOpts = {}): Promise<Encuesta[]> {
   if (opts.activa !== undefined) params.set('activa', String(opts.activa));
   if (opts.compania_id) params.set('compania_id', opts.compania_id);
   const qs = params.toString();
-  const res = await api.get<{ data: Encuesta[] }>(`/encuestas${qs ? `?${qs}` : ''}`);
+  const res = await api.get<Encuesta[]>(`/encuestas${qs ? `?${qs}` : ''}`);
   return res.data ?? [];
 }
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarRange, Plus, Trash2 } from 'lucide-react';
+import { CalendarRange, Trash2 } from 'lucide-react';
 import { useFestivos, useCreateFestivo, useDeleteFestivo, type Festivo } from '@/hooks/useFestivos';
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];

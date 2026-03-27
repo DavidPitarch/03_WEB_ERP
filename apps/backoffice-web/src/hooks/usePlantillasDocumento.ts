@@ -27,7 +27,7 @@ async function fetchPlantillas(opts: ListOpts = {}): Promise<PlantillaDocumento[
   if (opts.compania_id) params.set('compania_id', opts.compania_id);
   if (opts.seccion) params.set('seccion', opts.seccion);
   const qs = params.toString();
-  const res = await api.get<{ data: PlantillaDocumento[] }>(`/plantillas-documento${qs ? `?${qs}` : ''}`);
+  const res = await api.get<PlantillaDocumento[]>(`/plantillas-documento${qs ? `?${qs}` : ''}`);
   return res.data ?? [];
 }
 

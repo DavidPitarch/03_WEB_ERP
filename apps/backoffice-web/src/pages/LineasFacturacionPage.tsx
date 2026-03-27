@@ -19,7 +19,7 @@ type Filtro = 'todas' | 'activas' | 'inactivas';
 
 const EMPTY_FORM = {
   descripcion: '', codigo: '', unidad: 'ud', precio: 0,
-  tipo_iva: 'general', porcentaje_iva: 21, activa: true, orden: 0,
+  tipo_iva: 'general' as LineaFacturacion['tipo_iva'], porcentaje_iva: 21, activa: true, orden: 0,
 };
 
 function ivaBadgeClass(tipo: string) {
@@ -78,7 +78,7 @@ export function LineasFacturacionPage() {
 
   function handleTipoIvaChange(tipo: string) {
     const found = TIPOS_IVA.find((t) => t.value === tipo);
-    setForm((p) => ({ ...p, tipo_iva: tipo, porcentaje_iva: found?.pct ?? p.porcentaje_iva }));
+    setForm((p) => ({ ...p, tipo_iva: tipo as LineaFacturacion['tipo_iva'], porcentaje_iva: found?.pct ?? p.porcentaje_iva }));
   }
 
   async function handleSubmit(ev: React.FormEvent) {

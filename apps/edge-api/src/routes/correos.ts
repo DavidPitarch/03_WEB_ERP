@@ -80,7 +80,7 @@ correosRoutes.post('/', async (c) => {
 
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'correos_cuentas', operacion: 'INSERT', registro_id: data.id, actor_id: user.id, datos_nuevos: { ...data, password_encrypted: '[REDACTED]' } });
+  await insertAudit(supabase, { tabla: 'correos_cuentas', accion: 'INSERT', registro_id: data.id, actor_id: user.id, cambios: { ...data, password_encrypted: '[REDACTED]' } });
   return c.json({ data, error: null }, 201);
 });
 
@@ -121,7 +121,7 @@ correosRoutes.put('/:id', async (c) => {
 
   const auditPatch = { ...patch };
   if (auditPatch.password_encrypted) auditPatch.password_encrypted = '[REDACTED]';
-  await insertAudit(supabase, { tabla: 'correos_cuentas', operacion: 'UPDATE', registro_id: id, actor_id: user.id, datos_nuevos: auditPatch });
+  await insertAudit(supabase, { tabla: 'correos_cuentas', accion: 'UPDATE', registro_id: id, actor_id: user.id, cambios: auditPatch });
   return c.json({ data, error: null });
 });
 
@@ -134,6 +134,6 @@ correosRoutes.delete('/:id', async (c) => {
   const { error } = await supabase.from('correos_cuentas').delete().eq('id', id);
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'correos_cuentas', operacion: 'DELETE', registro_id: id, actor_id: user.id });
+  await insertAudit(supabase, { tabla: 'correos_cuentas', accion: 'DELETE', registro_id: id, actor_id: user.id });
   return c.json({ data: { id }, error: null });
 });

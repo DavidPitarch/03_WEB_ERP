@@ -66,7 +66,7 @@ plantillasDocumentoRoutes.post('/', async (c) => {
 
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'plantillas_documento', operacion: 'INSERT', registro_id: data.id, actor_id: user.id, datos_nuevos: data });
+  await insertAudit(supabase, { tabla: 'plantillas_documento', accion: 'INSERT', registro_id: data.id, actor_id: user.id, cambios: data });
   return c.json({ data, error: null }, 201);
 });
 
@@ -89,7 +89,7 @@ plantillasDocumentoRoutes.put('/:id', async (c) => {
   const { data, error } = await supabase.from('plantillas_documento').update(patch).eq('id', id).select().single();
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'plantillas_documento', operacion: 'UPDATE', registro_id: id, actor_id: user.id, datos_nuevos: patch });
+  await insertAudit(supabase, { tabla: 'plantillas_documento', accion: 'UPDATE', registro_id: id, actor_id: user.id, cambios: patch });
   return c.json({ data, error: null });
 });
 
@@ -102,6 +102,6 @@ plantillasDocumentoRoutes.delete('/:id', async (c) => {
   const { error } = await supabase.from('plantillas_documento').delete().eq('id', id);
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'plantillas_documento', operacion: 'DELETE', registro_id: id, actor_id: user.id });
+  await insertAudit(supabase, { tabla: 'plantillas_documento', accion: 'DELETE', registro_id: id, actor_id: user.id });
   return c.json({ data: { id }, error: null });
 });

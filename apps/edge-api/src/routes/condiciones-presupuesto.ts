@@ -50,7 +50,7 @@ condicionesPresupuestoRoutes.post('/', async (c) => {
 
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'condiciones_presupuesto', operacion: 'INSERT', registro_id: data.id, actor_id: user.id, datos_nuevos: data });
+  await insertAudit(supabase, { tabla: 'condiciones_presupuesto', accion: 'INSERT', registro_id: data.id, actor_id: user.id, cambios: data });
   return c.json({ data, error: null }, 201);
 });
 
@@ -77,7 +77,7 @@ condicionesPresupuestoRoutes.put('/:id', async (c) => {
 
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'condiciones_presupuesto', operacion: 'UPDATE', registro_id: id, actor_id: user.id, datos_nuevos: patch });
+  await insertAudit(supabase, { tabla: 'condiciones_presupuesto', accion: 'UPDATE', registro_id: id, actor_id: user.id, cambios: patch });
   return c.json({ data, error: null });
 });
 
@@ -90,6 +90,6 @@ condicionesPresupuestoRoutes.delete('/:id', async (c) => {
   const { error } = await supabase.from('condiciones_presupuesto').delete().eq('id', id);
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'condiciones_presupuesto', operacion: 'DELETE', registro_id: id, actor_id: user.id });
+  await insertAudit(supabase, { tabla: 'condiciones_presupuesto', accion: 'DELETE', registro_id: id, actor_id: user.id });
   return c.json({ data: { id }, error: null });
 });

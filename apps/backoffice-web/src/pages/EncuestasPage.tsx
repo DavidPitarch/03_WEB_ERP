@@ -34,7 +34,7 @@ type EmptyPregunta = { texto: string; tipo: string; obligatoria: boolean };
 const EMPTY_PREGUNTA: EmptyPregunta = { texto: '', tipo: 'escala', obligatoria: true };
 
 const EMPTY_FORM = {
-  titulo: '', descripcion: '', tipo: 'satisfaccion',
+  titulo: '', descripcion: '', tipo: 'satisfaccion' as Encuesta['tipo'],
   activa: true, envio_auto: false, dias_espera: 0,
 };
 
@@ -310,7 +310,7 @@ export function EncuestasPage() {
                     <select
                       className="form-control"
                       value={form.tipo}
-                      onChange={(e) => setForm((p) => ({ ...p, tipo: e.target.value }))}
+                      onChange={(e) => setForm((p) => ({ ...p, tipo: e.target.value as Encuesta['tipo'] }))}
                     >
                       {TIPOS_ENCUESTA.map((t) => (
                         <option key={t.value} value={t.value}>{t.label}</option>

@@ -55,7 +55,7 @@ lineasFacturacionRoutes.post('/', async (c) => {
     return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
   }
 
-  await insertAudit(supabase, { tabla: 'lineas_facturacion', operacion: 'INSERT', registro_id: data.id, actor_id: user.id, datos_nuevos: data });
+  await insertAudit(supabase, { tabla: 'lineas_facturacion', accion: 'INSERT', registro_id: data.id, actor_id: user.id, cambios: data });
   return c.json({ data, error: null }, 201);
 });
 
@@ -78,7 +78,7 @@ lineasFacturacionRoutes.put('/:id', async (c) => {
   const { data, error } = await supabase.from('lineas_facturacion').update(patch).eq('id', id).select().single();
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'lineas_facturacion', operacion: 'UPDATE', registro_id: id, actor_id: user.id, datos_nuevos: patch });
+  await insertAudit(supabase, { tabla: 'lineas_facturacion', accion: 'UPDATE', registro_id: id, actor_id: user.id, cambios: patch });
   return c.json({ data, error: null });
 });
 
@@ -91,6 +91,6 @@ lineasFacturacionRoutes.delete('/:id', async (c) => {
   const { error } = await supabase.from('lineas_facturacion').delete().eq('id', id);
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'lineas_facturacion', operacion: 'DELETE', registro_id: id, actor_id: user.id });
+  await insertAudit(supabase, { tabla: 'lineas_facturacion', accion: 'DELETE', registro_id: id, actor_id: user.id });
   return c.json({ data: { id }, error: null });
 });

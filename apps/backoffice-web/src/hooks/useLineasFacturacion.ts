@@ -30,7 +30,7 @@ async function fetchLineas(opts: ListOpts = {}): Promise<LineaFacturacion[]> {
   if (opts.compania_id) params.set('compania_id', opts.compania_id);
   if (opts.search) params.set('search', opts.search);
   const qs = params.toString();
-  const res = await api.get<{ data: LineaFacturacion[] }>(`/lineas-facturacion${qs ? `?${qs}` : ''}`);
+  const res = await api.get<LineaFacturacion[]>(`/lineas-facturacion${qs ? `?${qs}` : ''}`);
   return res.data ?? [];
 }
 

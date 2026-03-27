@@ -728,7 +728,7 @@ bancosRoutes.post('/movimientos', async (c) => {
   const user = c.get('user');
   const body = await c.req.json<{
     cuenta_id: string;
-    fecha_operacion: string;
+    fecha_accion: string;
     fecha_valor: string;
     concepto_banco: string;
     importe: number;
@@ -738,7 +738,7 @@ bancosRoutes.post('/movimientos', async (c) => {
 
   const check = validate(body, {
     cuenta_id:       { required: true, isUuid: true },
-    fecha_operacion: { required: true },
+    fecha_accion: { required: true },
     fecha_valor:     { required: true },
     concepto_banco:  { required: true, maxLength: 500 },
     importe:         { required: true, isNumber: true },
@@ -749,7 +749,7 @@ bancosRoutes.post('/movimientos', async (c) => {
     .from('movimientos_bancarios')
     .insert({
       cuenta_id:       body.cuenta_id,
-      fecha_operacion: body.fecha_operacion,
+      fecha_accion: body.fecha_operacion,
       fecha_valor:     body.fecha_valor,
       concepto_banco:  body.concepto_banco,
       importe:         body.importe,
@@ -770,7 +770,7 @@ bancosRoutes.post('/movimientos', async (c) => {
     registro_id: data.id,
     accion: 'INSERT',
     actor_id: user.id,
-    cambios: { cuenta_id: body.cuenta_id, fecha_operacion: body.fecha_operacion, importe: body.importe },
+    cambios: { cuenta_id: body.cuenta_id, fecha_accion: body.fecha_operacion, importe: body.importe },
   });
 
   return c.json({ data, error: null }, 201);
@@ -829,7 +829,7 @@ bancosRoutes.post('/movimientos/importar', async (c) => {
       .from('movimientos_bancarios')
       .insert({
         cuenta_id:       cuentaId,
-        fecha_operacion: row['fecha_operacion'],
+        fecha_accion: row['fecha_operacion'],
         fecha_valor:     row['fecha_valor'] || row['fecha_operacion'],
         concepto_banco:  row['concepto'],
         importe,

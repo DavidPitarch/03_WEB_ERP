@@ -39,7 +39,7 @@ centralitaRoutes.put('/config/:empresa_id', async (c) => {
 
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'centralita_config', operacion: 'UPDATE', registro_id: empresa_id, actor_id: user.id, datos_nuevos: record });
+  await insertAudit(supabase, { tabla: 'centralita_config', accion: 'UPDATE', registro_id: empresa_id, actor_id: user.id, cambios: record });
   return c.json({ data, error: null });
 });
 

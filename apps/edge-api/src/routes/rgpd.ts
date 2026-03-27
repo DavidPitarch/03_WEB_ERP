@@ -47,7 +47,7 @@ rgpdRoutes.put('/config/:empresa_id', async (c) => {
 
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'rgpd_config', operacion: 'UPDATE', registro_id: empresa_id, actor_id: user.id, datos_nuevos: record });
+  await insertAudit(supabase, { tabla: 'rgpd_config', accion: 'UPDATE', registro_id: empresa_id, actor_id: user.id, cambios: record });
   return c.json({ data, error: null });
 });
 
@@ -85,6 +85,6 @@ rgpdRoutes.post('/eliminaciones', async (c) => {
 
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'rgpd_eliminaciones', operacion: 'INSERT', registro_id: data.id, actor_id: user.id, datos_nuevos: data });
+  await insertAudit(supabase, { tabla: 'rgpd_eliminaciones', accion: 'INSERT', registro_id: data.id, actor_id: user.id, cambios: data });
   return c.json({ data, error: null }, 201);
 });

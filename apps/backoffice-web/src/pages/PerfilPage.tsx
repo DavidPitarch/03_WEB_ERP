@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, Lock, Phone, BadgeCheck, Mail, AtSign, PhoneCall } from 'lucide-react';
+import { User, Lock, BadgeCheck, Mail, AtSign, PhoneCall } from 'lucide-react';
 import { useUserProfile, useChangePassword } from '@/hooks/useUserProfile';
 
 // ─── Validación de contraseña ─────────────────────────────────────────────────

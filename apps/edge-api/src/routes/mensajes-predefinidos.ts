@@ -68,7 +68,7 @@ mensajesPredefinidosRoutes.post('/', async (c) => {
 
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'mensajes_predefinidos', operacion: 'INSERT', registro_id: data.id, actor_id: user.id, datos_nuevos: data });
+  await insertAudit(supabase, { tabla: 'mensajes_predefinidos', accion: 'INSERT', registro_id: data.id, actor_id: user.id, cambios: data });
   return c.json({ data, error: null }, 201);
 });
 
@@ -105,7 +105,7 @@ mensajesPredefinidosRoutes.put('/:id', async (c) => {
 
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'mensajes_predefinidos', operacion: 'UPDATE', registro_id: id, actor_id: user.id, datos_nuevos: patch });
+  await insertAudit(supabase, { tabla: 'mensajes_predefinidos', accion: 'UPDATE', registro_id: id, actor_id: user.id, cambios: patch });
   return c.json({ data, error: null });
 });
 
@@ -118,6 +118,6 @@ mensajesPredefinidosRoutes.delete('/:id', async (c) => {
   const { error } = await supabase.from('mensajes_predefinidos').delete().eq('id', id);
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'mensajes_predefinidos', operacion: 'DELETE', registro_id: id, actor_id: user.id });
+  await insertAudit(supabase, { tabla: 'mensajes_predefinidos', accion: 'DELETE', registro_id: id, actor_id: user.id });
   return c.json({ data: { id }, error: null });
 });

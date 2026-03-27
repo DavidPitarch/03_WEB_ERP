@@ -46,7 +46,8 @@ function accionBadgeClass(tipo: string) {
 
 const EMPTY_FORM = {
   nombre: '', descripcion: '',
-  trigger_tipo: 'creacion', accion_tipo: 'notificacion',
+  trigger_tipo: 'creacion' as ReglaAutomatizacion['trigger_tipo'],
+  accion_tipo: 'notificacion' as ReglaAutomatizacion['accion_tipo'],
   activa: true, orden: 0,
 };
 
@@ -273,7 +274,7 @@ export function EventosPage() {
                     <select
                       className="form-control"
                       value={form.trigger_tipo}
-                      onChange={(e) => setForm((p) => ({ ...p, trigger_tipo: e.target.value }))}
+                      onChange={(e) => setForm((p) => ({ ...p, trigger_tipo: e.target.value as ReglaAutomatizacion['trigger_tipo'] }))}
                       required
                     >
                       {TRIGGER_TIPOS.map((t) => (
@@ -292,7 +293,7 @@ export function EventosPage() {
                     <select
                       className="form-control"
                       value={form.accion_tipo}
-                      onChange={(e) => setForm((p) => ({ ...p, accion_tipo: e.target.value }))}
+                      onChange={(e) => setForm((p) => ({ ...p, accion_tipo: e.target.value as ReglaAutomatizacion['accion_tipo'] }))}
                       required
                     >
                       {ACCION_TIPOS.map((t) => (

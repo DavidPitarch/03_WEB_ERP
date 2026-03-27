@@ -36,7 +36,7 @@ function tipoBadgeClass(tipo: string) {
 }
 
 const EMPTY_GRUPO = { nombre: '', entidad: 'expediente', orden: 0 };
-const EMPTY_CAMPO = { nombre: '', tipo: 'text', opciones: [] as string[], obligatorio: false, orden: 0 };
+const EMPTY_CAMPO = { nombre: '', tipo: 'text' as CampoPersonalizado['tipo'], opciones: [] as string[], obligatorio: false, orden: 0 };
 
 export function GestionCamposPage() {
   const [entidadFilter, setEntidadFilter] = useState('');
@@ -407,7 +407,7 @@ export function GestionCamposPage() {
                     <select
                       className="form-control"
                       value={campoForm.tipo}
-                      onChange={(e) => setCampoForm((p) => ({ ...p, tipo: e.target.value }))}
+                      onChange={(e) => setCampoForm((p) => ({ ...p, tipo: e.target.value as CampoPersonalizado['tipo'] }))}
                     >
                       {TIPOS_CAMPO.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                     </select>

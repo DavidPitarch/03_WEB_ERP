@@ -72,7 +72,7 @@ encuestasRoutes.post('/', async (c) => {
     await supabase.from('preguntas_encuesta').insert(pregs);
   }
 
-  await insertAudit(supabase, { tabla: 'encuestas', operacion: 'INSERT', registro_id: encuesta.id, actor_id: user.id, datos_nuevos: encuesta });
+  await insertAudit(supabase, { tabla: 'encuestas', accion: 'INSERT', registro_id: encuesta.id, actor_id: user.id, cambios: encuesta });
   return c.json({ data: encuesta, error: null }, 201);
 });
 
@@ -93,7 +93,7 @@ encuestasRoutes.put('/:id', async (c) => {
   const { data, error } = await supabase.from('encuestas').update(patch).eq('id', id).select().single();
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'encuestas', operacion: 'UPDATE', registro_id: id, actor_id: user.id, datos_nuevos: patch });
+  await insertAudit(supabase, { tabla: 'encuestas', accion: 'UPDATE', registro_id: id, actor_id: user.id, cambios: patch });
   return c.json({ data, error: null });
 });
 
@@ -106,7 +106,7 @@ encuestasRoutes.delete('/:id', async (c) => {
   const { error } = await supabase.from('encuestas').delete().eq('id', id);
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
-  await insertAudit(supabase, { tabla: 'encuestas', operacion: 'DELETE', registro_id: id, actor_id: user.id });
+  await insertAudit(supabase, { tabla: 'encuestas', accion: 'DELETE', registro_id: id, actor_id: user.id });
   return c.json({ data: { id }, error: null });
 });
 

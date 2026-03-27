@@ -30,7 +30,7 @@ async function fetchGrupos(opts: ListOpts = {}): Promise<GrupoCampos[]> {
   if (opts.compania_id) params.set('compania_id', opts.compania_id);
   if (opts.entidad) params.set('entidad', opts.entidad);
   const qs = params.toString();
-  const res = await api.get<{ data: GrupoCampos[] }>(`/grupos-campos${qs ? `?${qs}` : ''}`);
+  const res = await api.get<GrupoCampos[]>(`/grupos-campos${qs ? `?${qs}` : ''}`);
   return res.data ?? [];
 }
 

@@ -26,7 +26,7 @@ async function fetchEventos(opts: ListOpts = {}): Promise<ReglaAutomatizacion[]>
   if (opts.activa !== undefined) params.set('activa', String(opts.activa));
   if (opts.compania_id) params.set('compania_id', opts.compania_id);
   const qs = params.toString();
-  const res = await api.get<{ data: ReglaAutomatizacion[] }>(`/eventos${qs ? `?${qs}` : ''}`);
+  const res = await api.get<ReglaAutomatizacion[]>(`/eventos${qs ? `?${qs}` : ''}`);
   return res.data ?? [];
 }
 

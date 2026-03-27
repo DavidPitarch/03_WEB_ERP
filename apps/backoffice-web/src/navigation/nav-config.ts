@@ -492,6 +492,15 @@ export const NAV_GROUPS: NavGroup[] = [
         description: 'Textos de condiciones para presupuestos',
       },
       {
+        id: 'lineas-facturacion',
+        label: 'Líneas de Facturación',
+        path: '/lineas-facturacion',
+        icon: 'Receipt',
+        roles: ['admin', 'supervisor', 'financiero'],
+        status: 'implemented',
+        description: 'Catálogo de conceptos reutilizables en presupuestos y facturas',
+      },
+      {
         id: 'documentos',
         label: 'Documentos',
         path: '/control/documentos',

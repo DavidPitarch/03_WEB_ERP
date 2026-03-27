@@ -153,12 +153,14 @@ export function AppSidebar({ open, onClose, collapsed: collapsedProp, onCollapse
         {/* Pie — usuario y logout */}
         <div className="sidebar-footer">
           <div className="sidebar-user" title={collapsed ? userEmail : undefined}>
-            <div className="sidebar-user__avatar">{userInitial}</div>
+            <Link to="/perfil" className="sidebar-user__avatar" title="Mis datos" onClick={onClose}>
+              {userInitial}
+            </Link>
             {!collapsed && (
-              <div className="sidebar-user__info">
+              <Link to="/perfil" className="sidebar-user__info" title="Mis datos" onClick={onClose}>
                 <div className="sidebar-user__name" title={userEmail}>{userEmail}</div>
                 <div className="sidebar-user__role">Backoffice</div>
-              </div>
+              </Link>
             )}
             <button className="sidebar-logout-btn" onClick={handleSignOut} title="Cerrar sesión" type="button">
               <LogOut size={14} />

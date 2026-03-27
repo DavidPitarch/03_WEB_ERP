@@ -61,6 +61,18 @@ import { PlanningPage } from '@/pages/PlanningPage';
 import { PlanningGeoPage } from '@/pages/PlanningGeoPage';
 import { AsignacionesPage } from '@/pages/AsignacionesPage';
 import { TrabajosPendientesPage } from '@/pages/TrabajosPendientesPage';
+import { PerfilPage } from '@/pages/PerfilPage';
+import { ComercialesPage } from '@/pages/ComercialesPage';
+import { GestorTiposPage } from '@/pages/GestorTiposPage';
+import { DocRequeridaPage } from '@/pages/DocRequeridaPage';
+import { FestivosPage } from '@/pages/FestivosPage';
+import { AcercaDePage } from '@/pages/AcercaDePage';
+import { CondicionesPresupuestosPage } from '@/pages/CondicionesPresupuestosPage';
+import { CorreosPage } from '@/pages/CorreosPage';
+import { RgpdPage } from '@/pages/RgpdPage';
+import { AutoVisitasPage } from '@/pages/AutoVisitasPage';
+import { CentralitaPage } from '@/pages/CentralitaPage';
+import { LineasFacturacionPage } from '@/pages/LineasFacturacionPage';
 
 export function App() {
   const { user, loading } = useAuth();
@@ -170,6 +182,24 @@ export function App() {
 
         <Route path="/config-emision" element={<ConfigEmisionPage />} />
 
+        {/* Nuevos módulos FASE A */}
+        <Route path="/comerciales" element={<ComercialesPage />} />
+        <Route path="/gestor-tipos" element={<GestorTiposPage />} />
+        <Route path="/doc-requerida" element={<DocRequeridaPage />} />
+        <Route path="/festivos" element={<FestivosPage />} />
+        <Route path="/acerca-de" element={<AcercaDePage />} />
+
+        {/* Nuevos módulos FASE B */}
+        <Route path="/condiciones-presupuestos" element={<CondicionesPresupuestosPage />} />
+        <Route path="/correos" element={<CorreosPage />} />
+        <Route path="/rgpd" element={<RgpdPage />} />
+        <Route path="/auto-visitas" element={<AutoVisitasPage />} />
+        <Route path="/centralita" element={<CentralitaPage />} />
+        <Route path="/lineas-facturacion" element={<LineasFacturacionPage />} />
+
+        {/* Perfil de usuario */}
+        <Route path="/perfil" element={<PerfilPage />} />
+
         {/* Legacy - mantener compatibilidad */}
         <Route path="/maestros" element={<MaestrosPage />} />
 
@@ -178,7 +208,7 @@ export function App() {
         <Route path="/presupuestos"       element={<PlaceholderPage moduleName="Presupuestos" description="Lista de presupuestos. El detalle (/presupuestos/:id) ya está implementado." status="partial" />} />
         <Route path="/operarios"          element={<Navigate to="/operarios-config" replace />} />
         <Route path="/rentings"           element={<PlaceholderPage moduleName="Rentings" description="Gestión de contratos de renting asociados a siniestros." status="new" />} />
-        <Route path="/correo/cuentas"     element={<PlaceholderPage moduleName="Cuentas correo" description="Cuentas IMAP/SMTP y Resend configuradas para el sistema." status="new" />} />
+        <Route path="/correo/cuentas"     element={<CorreosPage />} />
         <Route path="/correo/configuracion" element={<PlaceholderPage moduleName="Configuración correo" description="Plantillas, reglas de enrutamiento y configuración de email transaccional." status="new" />} />
         <Route path="/planning/agenda"    element={<PlaceholderPage moduleName="Agenda mensual" description="Agenda operativa mensual de citas y visitas con vistas de calendario." status="new" />} />
         <Route path="/control/documentos" element={<PlaceholderPage moduleName="Documentos" description="Gestión documental centralizada sobre Supabase Storage con permisos por rol." status="new" />} />

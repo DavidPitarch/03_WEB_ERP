@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Pencil } from 'lucide-react';
 import {
   useTramitadores,
   useCrearTramitador,
@@ -29,6 +30,8 @@ function formatDateTime(iso?: string | null) {
   });
 }
 
+type EditTab = 'datos' | 'acceso' | 'permisos' | 'reasignacion' | 'centralita' | 'webmail' | 'carga';
+
 export function UsuariosPage() {
   const { data: res, isLoading, refetch } = useTramitadores();
   const crearTramitador  = useCrearTramitador();
@@ -43,6 +46,11 @@ export function UsuariosPage() {
     telefono: '', nivel: 'tramitador', max_expedientes_activos: 30, max_urgentes: 5,
   });
   const [formError, setFormError] = useState('');
+
+  // 7-tab edit dialog
+  const [editUser, setEditUser] = useState<any>(null);
+  const [editTab, setEditTab] = useState<EditTab>('datos');
+  const [editForm, setEditForm] = useState<Record<string, any>>({});
 
   const tramitadores: any[] = res?.data ?? [];
 
@@ -72,6 +80,17 @@ export function UsuariosPage() {
 
   async function handleAusente(id: string, ausente: boolean) {
     await toggleAusente.mutateAsync({ id, ausente });
+  }
+
+  function openEdit(t: any) {
+    setEditUser(t);
+    setEditForm({
+      nombre: t.nombre ?? '', apellidos: t.apellidos ?? '', email: t.email ?? '',
+      nif: t.nif ?? '', telefono: t.telefono ?? '', extension: t.extension ?? '',
+      horas_convenio: t.horas_convenio ?? 40, max_expedientes_activos: t.max_expedientes_activos ?? 30,
+      max_urgentes: t.max_urgentes ?? 5, activo: t.activo ?? true,
+    });
+    setEditTab('datos');
   }
 
   return (
@@ -234,12 +253,21 @@ export function UsuariosPage() {
                     {/* Acciones */}
                     <td>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                        {/* Editar */}
+                        {/* Editar — abre dialog 7 tabs */}
+                        <button
+                          className="btn btn-secondary"
+                          style={{ padding: '4px 8px', display: 'inline-flex', alignItems: 'center' }}
+                          title="Editar usuario"
+                          onClick={() => openEdit(t)}
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        {/* Ver detalle */}
                         <Link
                           to={`/usuarios/tramitador/${t.tramitador_id ?? t.id}`}
                           className="btn btn-secondary"
                           style={{ padding: '4px 8px', display: 'inline-flex', alignItems: 'center' }}
-                          title="Editar"
+                          title="Ver detalle"
                         >
                           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                             <path d="M11 2.5l2.5 2.5-7.5 7.5H3.5v-2.5L11 2.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
@@ -416,6 +444,187 @@ export function UsuariosPage() {
               >
                 {toggleTramitador.isPending ? 'Procesando...' : 'Confirmar baja'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Editar usuario (7 tabs) ── */}
+      {editUser && (
+        <div className="modal-overlay-v2" onClick={() => setEditUser(null)}>
+          <div className="modal-v2 modal-v2--lg" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700 }}>
+            <div className="modal-v2__header">
+              <div>
+                <div className="modal-v2__title">Editar: {editUser.nombre} {editUser.apellidos}</div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>{editUser.email}</div>
+              </div>
+              <button className="modal-v2__close" onClick={() => setEditUser(null)} aria-label="Cerrar">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border-default)', padding: '0 24px', overflowX: 'auto' }}>
+              {([
+                ['datos', 'Datos'],
+                ['acceso', 'Acceso'],
+                ['permisos', 'Permisos'],
+                ['reasignacion', 'Reasignación'],
+                ['centralita', 'Centralita'],
+                ['webmail', 'Webmail'],
+                ['carga', 'Carga'],
+              ] as const).map(([key, label]) => (
+                <button key={key} onClick={() => setEditTab(key)} style={{
+                  padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500,
+                  borderBottom: editTab === key ? '2px solid var(--color-primary)' : '2px solid transparent',
+                  color: editTab === key ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                  marginBottom: -1, whiteSpace: 'nowrap',
+                }}>{label}</button>
+              ))}
+            </div>
+
+            <div className="modal-v2__body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* Tab: Datos */}
+              {editTab === 'datos' && (
+                <div className="form-grid-v2">
+                  <div className="form-group-v2">
+                    <label className="form-label">Nombre</label>
+                    <input className="form-control" value={editForm.nombre ?? ''} onChange={(e) => setEditForm(p => ({ ...p, nombre: e.target.value }))} />
+                  </div>
+                  <div className="form-group-v2">
+                    <label className="form-label">Apellidos</label>
+                    <input className="form-control" value={editForm.apellidos ?? ''} onChange={(e) => setEditForm(p => ({ ...p, apellidos: e.target.value }))} />
+                  </div>
+                  <div className="form-group-v2">
+                    <label className="form-label">NIF</label>
+                    <input className="form-control" value={editForm.nif ?? ''} onChange={(e) => setEditForm(p => ({ ...p, nif: e.target.value }))} />
+                  </div>
+                  <div className="form-group-v2">
+                    <label className="form-label">Teléfono</label>
+                    <input className="form-control" value={editForm.telefono ?? ''} onChange={(e) => setEditForm(p => ({ ...p, telefono: e.target.value }))} />
+                  </div>
+                  <div className="form-group-v2">
+                    <label className="form-label">Horas convenio/semana</label>
+                    <input className="form-control" type="number" min={0} max={80} value={editForm.horas_convenio ?? 40} onChange={(e) => setEditForm(p => ({ ...p, horas_convenio: parseInt(e.target.value) || 40 }))} />
+                  </div>
+                  <div className="form-group-v2" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="checkbox" checked={editForm.activo ?? true} onChange={(e) => setEditForm(p => ({ ...p, activo: e.target.checked }))} style={{ width: 16, height: 16 }} />
+                    <label className="form-label" style={{ margin: 0 }}>Usuario activo</label>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: Acceso */}
+              {editTab === 'acceso' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className="form-group-v2">
+                    <label className="form-label">Email de acceso (usuario)</label>
+                    <input className="form-control" value={editUser.email ?? ''} readOnly style={{ background: 'var(--color-bg-muted)' }} />
+                    <div className="form-hint">El email de acceso no puede modificarse desde aquí.</div>
+                  </div>
+                  <div className="form-group-v2">
+                    <label className="form-label">Nueva contraseña</label>
+                    <input className="form-control" type="password" placeholder="Dejar en blanco para no cambiar" autoComplete="new-password" />
+                  </div>
+                  <div style={{ background: 'var(--color-bg-subtle)', borderRadius: 8, padding: '12px 16px', fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                    El cambio de contraseña real se realiza desde <strong>Datos de Usuario → Cambio de Contraseña</strong> o mediante el flujo de restablecimiento.
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: Permisos */}
+              {editTab === 'permisos' && (
+                <div>
+                  <div className="form-group-v2" style={{ marginBottom: 12 }}>
+                    <label className="form-label">Rol del usuario</label>
+                    <select className="form-control" value={editUser.nivel ?? 'tramitador'} style={{ maxWidth: 280 }}>
+                      <option value="tramitador">Tramitador</option>
+                      <option value="facturacion">Facturación</option>
+                      <option value="redes">Redes</option>
+                      <option value="administrador">Administrador</option>
+                      <option value="super_administrador">Super Administrador</option>
+                    </select>
+                  </div>
+                  <div style={{ background: 'var(--color-bg-subtle)', borderRadius: 8, padding: '12px 16px', fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                    Los permisos granulares adicionales se gestionan a través de la tabla <code>user_roles</code>. Contacta con el administrador del sistema para cambios avanzados.
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: Reasignación */}
+              {editTab === 'reasignacion' && (
+                <div>
+                  <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 16 }}>
+                    Reasigna los expedientes activos de este usuario a otro tramitador.
+                  </p>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+                    <div className="form-group-v2" style={{ flex: 1, margin: 0 }}>
+                      <label className="form-label">Tramitador destino</label>
+                      <select className="form-control">
+                        <option value="">Seleccionar tramitador...</option>
+                      </select>
+                    </div>
+                    <button className="btn btn-secondary">Reasignar expedientes</button>
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 12 }}>
+                    Esta acción reasignará todos los expedientes activos del usuario. Disponible en la vista de <Link to="/usuarios/reasignacion-masiva" style={{ color: 'var(--color-primary)' }}>Reasignación masiva</Link>.
+                  </p>
+                </div>
+              )}
+
+              {/* Tab: Centralita */}
+              {editTab === 'centralita' && (
+                <div className="form-grid-v2">
+                  <div className="form-group-v2">
+                    <label className="form-label">Extensión</label>
+                    <input className="form-control" value={editForm.extension ?? ''} placeholder="Ej. 101" onChange={(e) => setEditForm(p => ({ ...p, extension: e.target.value }))} />
+                  </div>
+                  <div className="form-group-v2">
+                    <label className="form-label">Teléfono directo</label>
+                    <input className="form-control" value={editForm.telefono ?? ''} onChange={(e) => setEditForm(p => ({ ...p, telefono: e.target.value }))} />
+                  </div>
+                  <div className="form-group-v2 span-full">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                      <input type="checkbox" style={{ width: 15, height: 15 }} />
+                      <span className="form-label" style={{ margin: 0 }}>Usar softphone Bria</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: Webmail */}
+              {editTab === 'webmail' && (
+                <div>
+                  <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 12 }}>
+                    Cuentas de correo asignadas a este usuario para el módulo de comunicaciones.
+                  </p>
+                  <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '24px 0' }}>
+                    Sin cuentas de correo asignadas. Configura las cuentas en <strong>Buzón Correo → Cuentas correo</strong>.
+                  </p>
+                </div>
+              )}
+
+              {/* Tab: Carga */}
+              {editTab === 'carga' && (
+                <div className="form-grid-v2">
+                  <div className="form-group-v2">
+                    <label className="form-label">Máx. expedientes activos</label>
+                    <input className="form-control" type="number" min={1} max={500} value={editForm.max_expedientes_activos ?? 30} onChange={(e) => setEditForm(p => ({ ...p, max_expedientes_activos: parseInt(e.target.value) || 30 }))} />
+                    <div className="form-hint">Límite de carga simultánea</div>
+                  </div>
+                  <div className="form-group-v2">
+                    <label className="form-label">Máx. urgentes simultáneos</label>
+                    <input className="form-control" type="number" min={0} max={50} value={editForm.max_urgentes ?? 5} onChange={(e) => setEditForm(p => ({ ...p, max_urgentes: parseInt(e.target.value) || 5 }))} />
+                    <div className="form-hint">Expedientes de prioridad alta</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-v2__footer">
+              <button className="btn btn-secondary" onClick={() => setEditUser(null)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={() => setEditUser(null)}>Guardar cambios</button>
             </div>
           </div>
         </div>

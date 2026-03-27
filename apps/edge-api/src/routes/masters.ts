@@ -10,12 +10,16 @@ export const mastersRoutes = new Hono<{ Bindings: Env }>();
 
 mastersRoutes.get('/companias', async (c) => {
   const supabase = c.get('supabase');
-  const activa = c.req.query('activa');
-  const search = c.req.query('search');
+  const activa  = c.req.query('activa');
+  const search  = c.req.query('search');
+  const tipo    = c.req.query('tipo');
+  const sistema = c.req.query('sistema_integracion');
 
   let query = supabase.from('companias').select('*').order('nombre');
   if (activa === 'true') query = query.eq('activa', true);
-  if (search) query = query.or(`nombre.ilike.%${search}%,codigo.ilike.%${search}%`);
+  if (search)  query = query.or(`nombre.ilike.%${search}%,codigo.ilike.%${search}%`);
+  if (tipo)    query = query.eq('tipo', tipo);
+  if (sistema) query = query.eq('sistema_integracion', sistema);
 
   const { data, error } = await query;
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
@@ -114,9 +118,11 @@ mastersRoutes.post('/companias', async (c) => {
   const { data, error } = await supabase.from('companias').insert({
     nombre: body.nombre,
     codigo: body.codigo,
-    cif: body.cif ?? null,
-    activa: body.activa ?? true,
-    config: body.config ?? {},
+    cif:                 body.cif ?? null,
+    activa:              body.activa ?? true,
+    tipo:                body.tipo ?? 'compania',
+    sistema_integracion: body.sistema_integracion ?? null,
+    config:              body.config ?? {},
   }).select().single();
 
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
@@ -132,17 +138,117 @@ mastersRoutes.put('/companias/:id', async (c) => {
   const body = await c.req.json();
 
   const { data, error } = await supabase.from('companias').update({
-    nombre: body.nombre,
-    codigo: body.codigo,
-    cif: body.cif,
-    activa: body.activa,
-    config: body.config,
+    nombre:              body.nombre,
+    codigo:              body.codigo,
+    cif:                 body.cif,
+    activa:              body.activa,
+    tipo:                body.tipo,
+    sistema_integracion: body.sistema_integracion,
+    config:              body.config,
   }).eq('id', id).select().single();
 
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
 
   await insertAudit(supabase, { tabla: 'companias', registro_id: id, accion: 'UPDATE', actor_id: user.id, cambios: body });
   return c.json({ data, error: null });
+});
+
+// ── Especialidades de una compañía ─────────────────────────────────────────
+
+mastersRoutes.get('/companias/:id/especialidades', async (c) => {
+  const supabase = c.get('supabase');
+  const id = c.req.param('id');
+
+  const { data, error } = await supabase
+    .from('compania_especialidades')
+    .select(`
+      id,
+      compania_id,
+      especialidad_id,
+      dias_caducidad,
+      dias_caducidad_confirmar,
+      created_at,
+      updated_at,
+      especialidades ( id, nombre, codigo, activa, orden )
+    `)
+    .eq('compania_id', id)
+    .order('especialidades(orden)')
+    .order('especialidades(nombre)');
+
+  if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+  return c.json({ data: data ?? [], error: null });
+});
+
+mastersRoutes.post('/companias/:id/especialidades', async (c) => {
+  const supabase = c.get('supabase');
+  const user = c.get('user');
+  const companiaId = c.req.param('id');
+  const body = await c.req.json<{ especialidad_id: string; dias_caducidad?: number; dias_caducidad_confirmar?: number }>();
+
+  if (!body.especialidad_id) {
+    return c.json({ data: null, error: { code: 'VALIDATION', message: 'especialidad_id requerido' } }, 422);
+  }
+
+  const { data, error } = await supabase
+    .from('compania_especialidades')
+    .insert({
+      compania_id:              companiaId,
+      especialidad_id:          body.especialidad_id,
+      dias_caducidad:           body.dias_caducidad ?? 0,
+      dias_caducidad_confirmar: body.dias_caducidad_confirmar ?? 0,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === '23505') return c.json({ data: null, error: { code: 'DUPLICATE', message: 'Especialidad ya asignada a esta compañía' } }, 409);
+    return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+  }
+
+  await insertAudit(supabase, { tabla: 'compania_especialidades', registro_id: data.id, accion: 'INSERT', actor_id: user.id, cambios: body });
+  return c.json({ data, error: null }, 201);
+});
+
+mastersRoutes.put('/companias/:id/especialidades/:espId', async (c) => {
+  const supabase = c.get('supabase');
+  const user = c.get('user');
+  const companiaId = c.req.param('id');
+  const espId      = c.req.param('espId');
+  const body = await c.req.json<{ dias_caducidad?: number; dias_caducidad_confirmar?: number }>();
+
+  const { data, error } = await supabase
+    .from('compania_especialidades')
+    .update({
+      dias_caducidad:           body.dias_caducidad,
+      dias_caducidad_confirmar: body.dias_caducidad_confirmar,
+    })
+    .eq('id', espId)
+    .eq('compania_id', companiaId)
+    .select()
+    .single();
+
+  if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+
+  await insertAudit(supabase, { tabla: 'compania_especialidades', registro_id: espId, accion: 'UPDATE', actor_id: user.id, cambios: body });
+  return c.json({ data, error: null });
+});
+
+mastersRoutes.delete('/companias/:id/especialidades/:espId', async (c) => {
+  const supabase = c.get('supabase');
+  const user = c.get('user');
+  const companiaId = c.req.param('id');
+  const espId      = c.req.param('espId');
+
+  const { error } = await supabase
+    .from('compania_especialidades')
+    .delete()
+    .eq('id', espId)
+    .eq('compania_id', companiaId);
+
+  if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+
+  await insertAudit(supabase, { tabla: 'compania_especialidades', registro_id: espId, accion: 'DELETE', actor_id: user.id, cambios: {} });
+  return c.json({ data: { deleted: true }, error: null });
 });
 
 // ═══════════════════════════════════════

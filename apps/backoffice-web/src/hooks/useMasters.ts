@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import type { Compania, Operario, Asegurado, EmpresaFacturadora } from '@erp/types';
+import type { Compania, CompaniaEspecialidad, CompaniaSistema, Operario, Asegurado, EmpresaFacturadora } from '@erp/types';
 
 // ─── Tramitadores by company ───────────────────────────────────────────────────
 
@@ -48,10 +48,67 @@ export function useCompanias() {
   });
 }
 
-export function useAllCompanias() {
+export function useAllCompanias(filters?: { sistema_integracion?: CompaniaSistema | '' }) {
+  const params = new URLSearchParams();
+  if (filters?.sistema_integracion) params.set('sistema_integracion', filters.sistema_integracion);
+  const qs = params.toString();
   return useQuery({
-    queryKey: ['companias-all'],
-    queryFn: () => api.get<Compania[]>('/masters/companias'),
+    queryKey: ['companias-all', filters],
+    queryFn: () => api.get<Compania[]>(`/masters/companias${qs ? `?${qs}` : ''}`),
+  });
+}
+
+// ─── Especialidades por compañía ──────────────────────────────────────────────
+
+export function useCompaniaEspecialidades(companiaId: string | null) {
+  return useQuery({
+    queryKey: ['compania-especialidades', companiaId],
+    queryFn: () => api.get<CompaniaEspecialidad[]>(`/masters/companias/${companiaId}/especialidades`),
+    enabled: !!companiaId,
+  });
+}
+
+export function useAddCompaniaEspecialidad() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      companiaId, especialidadId, diasCaducidad, diasCaducidadConfirmar,
+    }: { companiaId: string; especialidadId: string; diasCaducidad?: number; diasCaducidadConfirmar?: number }) =>
+      api.post<CompaniaEspecialidad>(`/masters/companias/${companiaId}/especialidades`, {
+        especialidad_id:          especialidadId,
+        dias_caducidad:           diasCaducidad ?? 0,
+        dias_caducidad_confirmar: diasCaducidadConfirmar ?? 0,
+      }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['compania-especialidades', vars.companiaId] });
+    },
+  });
+}
+
+export function useUpdateCompaniaEspecialidad() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      companiaId, espId, diasCaducidad, diasCaducidadConfirmar,
+    }: { companiaId: string; espId: string; diasCaducidad: number; diasCaducidadConfirmar: number }) =>
+      api.put<CompaniaEspecialidad>(`/masters/companias/${companiaId}/especialidades/${espId}`, {
+        dias_caducidad:           diasCaducidad,
+        dias_caducidad_confirmar: diasCaducidadConfirmar,
+      }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['compania-especialidades', vars.companiaId] });
+    },
+  });
+}
+
+export function useRemoveCompaniaEspecialidad() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ companiaId, espId }: { companiaId: string; espId: string }) =>
+      api.del<{ deleted: boolean }>(`/masters/companias/${companiaId}/especialidades/${espId}`),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['compania-especialidades', vars.companiaId] });
+    },
   });
 }
 

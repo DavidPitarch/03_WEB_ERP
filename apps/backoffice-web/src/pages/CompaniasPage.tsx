@@ -7,9 +7,41 @@ import {
   useAllTramitadores,
   useAddCompaniaTramitador,
   useRemoveCompaniaTramitador,
+  useCompaniaEspecialidades,
+  useAddCompaniaEspecialidad,
+  useUpdateCompaniaEspecialidad,
+  useRemoveCompaniaEspecialidad,
 } from '@/hooks/useMasters';
 import { useBaremos } from '@/hooks/useBaremos';
-import type { Compania } from '@erp/types';
+import { useEspecialidades } from '@/hooks/useEspecialidades';
+import type { Compania, CompaniaTipo, CompaniaSistema, CompaniaEspecialidad } from '@erp/types';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const TIPOS: { value: CompaniaTipo; label: string }[] = [
+  { value: 'compania',              label: 'Compañía aseguradora' },
+  { value: 'correduria',            label: 'Correduría de seguros' },
+  { value: 'administrador_fincas',  label: 'Administrador de fincas' },
+];
+
+const SISTEMAS: { value: CompaniaSistema; label: string }[] = [
+  { value: 'ADMINISTRADOR_FINCA',  label: 'Administrador Finca' },
+  { value: 'ASITUR',               label: 'ASITUR' },
+  { value: 'FAMAEX',               label: 'FAMAEX' },
+  { value: 'FUNCIONA',             label: 'FUNCIONA' },
+  { value: 'GENERALI',             label: 'GENERALI' },
+  { value: 'IMA',                  label: 'IMA' },
+  { value: 'RNET_EMAIL',           label: 'RNET-EMAIL' },
+  { value: 'LAGUNARO',             label: 'LAGUNARO' },
+  { value: 'LDWEB',                label: 'LDWEB' },
+  { value: 'MULTIASISTENCIA_WS',   label: 'MULTIASISTENCIA WS' },
+  { value: 'MUTUA',                label: 'MUTUA' },
+  { value: 'NINGUNO',              label: 'Ninguno' },
+  { value: 'PAP',                  label: 'P.A.P.' },
+  { value: 'PELAYO',               label: 'PELAYO' },
+  { value: 'SICI',                 label: 'SICI' },
+  { value: 'VERYFICA',             label: 'VERYFICA' },
+];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,6 +49,7 @@ type Section = 'especialidades' | 'baremos' | 'tramitadores' | 'plantillas';
 type ExpandedRow = { companiaId: string; section: Section };
 
 interface CompaniaConfig {
+  [key: string]: unknown;
   domicilio: string;
   cp: string;
   poblacion: string;
@@ -37,6 +70,8 @@ interface CompaniaForm {
   codigo: string;
   cif: string;
   activa: boolean;
+  tipo: CompaniaTipo;
+  sistema_integracion: CompaniaSistema | '';
   config: CompaniaConfig;
 }
 
@@ -48,16 +83,20 @@ const CONFIG_DEFAULT: CompaniaConfig = {
 };
 
 const FORM_DEFAULT: CompaniaForm = {
-  nombre: '', codigo: '', cif: '', activa: true, config: { ...CONFIG_DEFAULT },
+  nombre: '', codigo: '', cif: '', activa: true,
+  tipo: 'compania', sistema_integracion: '',
+  config: { ...CONFIG_DEFAULT },
 };
 
 function companiaToForm(c: Compania): CompaniaForm {
   const cfg = (c.config ?? {}) as Record<string, unknown>;
   return {
-    nombre: c.nombre,
-    codigo: c.codigo,
-    cif: c.cif ?? '',
-    activa: c.activa,
+    nombre:              c.nombre,
+    codigo:              c.codigo,
+    cif:                 c.cif ?? '',
+    activa:              c.activa,
+    tipo:                c.tipo ?? 'compania',
+    sistema_integracion: (c.sistema_integracion ?? '') as CompaniaSistema | '',
     config: {
       domicilio:         String(cfg.domicilio ?? ''),
       cp:                String(cfg.cp ?? ''),
@@ -76,7 +115,152 @@ function companiaToForm(c: Compania): CompaniaForm {
   };
 }
 
-// ─── Inline Panels ────────────────────────────────────────────────────────────
+// ─── EspecialidadesPanel ──────────────────────────────────────────────────────
+
+function EspecialidadesPanel({ companiaId }: { companiaId: string }) {
+  const { data: asignadasRes, isLoading } = useCompaniaEspecialidades(companiaId);
+  const { data: todasRes }                = useEspecialidades(true);
+  const addMut    = useAddCompaniaEspecialidad();
+  const updateMut = useUpdateCompaniaEspecialidad();
+  const removeMut = useRemoveCompaniaEspecialidad();
+
+  const [selectedEspId, setSelectedEspId] = useState('');
+  const [editing, setEditing] = useState<{ espId: string; dias: number; diasC: number } | null>(null);
+
+  const asignadas: CompaniaEspecialidad[] = (asignadasRes as any)?.data ?? [];
+  const todas: any[]                      = (todasRes as any)?.data ?? [];
+  const asignadasIds = new Set(asignadas.map(e => e.especialidad_id));
+  const disponibles  = todas.filter(e => !asignadasIds.has(e.id));
+
+  const handleAdd = () => {
+    if (!selectedEspId) return;
+    addMut.mutate(
+      { companiaId, especialidadId: selectedEspId },
+      { onSuccess: () => setSelectedEspId('') },
+    );
+  };
+
+  const startEdit = (row: CompaniaEspecialidad) => {
+    setEditing({ espId: row.id, dias: row.dias_caducidad, diasC: row.dias_caducidad_confirmar });
+  };
+
+  const saveEdit = () => {
+    if (!editing) return;
+    updateMut.mutate(
+      { companiaId, espId: editing.espId, diasCaducidad: editing.dias, diasCaducidadConfirmar: editing.diasC },
+      { onSuccess: () => setEditing(null) },
+    );
+  };
+
+  if (isLoading) return <div className="cpanel__loading">Cargando especialidades…</div>;
+
+  return (
+    <div>
+      {/* Añadir especialidad */}
+      <div className="cpanel__add-row">
+        <select
+          className="form-control cpanel__select"
+          value={selectedEspId}
+          onChange={e => setSelectedEspId(e.target.value)}
+        >
+          <option value="">Seleccione especialidad…</option>
+          {disponibles.map((e: any) => (
+            <option key={e.id} value={e.id}>{e.nombre}</option>
+          ))}
+        </select>
+        <button
+          className="btn-primary btn--sm"
+          onClick={handleAdd}
+          disabled={!selectedEspId || addMut.isPending}
+        >
+          Añadir especialidad
+        </button>
+      </div>
+
+      {asignadas.length === 0 ? (
+        <div className="cpanel__empty">No hay especialidades asignadas a esta compañía.</div>
+      ) : (
+        <table className="data-table cpanel__table">
+          <thead>
+            <tr>
+              <th>Especialidad</th>
+              <th style={{ width: 140 }}>Días caducidad</th>
+              <th style={{ width: 160 }}>Días cad. confirmar</th>
+              <th style={{ width: 100 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {asignadas.map(row => {
+              const isEditing = editing?.espId === row.id;
+              const nombre = (row as any).especialidades?.nombre ?? row.especialidad_id;
+              return (
+                <tr key={row.id}>
+                  <td><strong>{nombre}</strong></td>
+                  <td>
+                    {isEditing ? (
+                      <input
+                        type="number" min={0} className="form-control"
+                        style={{ width: 80 }}
+                        value={editing.dias}
+                        onChange={e => setEditing(prev => prev ? { ...prev, dias: Number(e.target.value) } : prev)}
+                      />
+                    ) : (
+                      row.dias_caducidad
+                    )}
+                  </td>
+                  <td>
+                    {isEditing ? (
+                      <input
+                        type="number" min={0} className="form-control"
+                        style={{ width: 80 }}
+                        value={editing.diasC}
+                        onChange={e => setEditing(prev => prev ? { ...prev, diasC: Number(e.target.value) } : prev)}
+                      />
+                    ) : (
+                      row.dias_caducidad_confirmar
+                    )}
+                  </td>
+                  <td style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                    {isEditing ? (
+                      <>
+                        <button
+                          className="btn-primary btn--sm"
+                          onClick={saveEdit}
+                          disabled={updateMut.isPending}
+                        >
+                          Guardar
+                        </button>
+                        <button className="btn-secondary btn--sm" onClick={() => setEditing(null)}>
+                          Cancelar
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button className="btn-secondary btn--sm" onClick={() => startEdit(row)}>
+                          Editar
+                        </button>
+                        <button
+                          className="btn-link"
+                          style={{ color: 'var(--red-600)', fontSize: 'var(--text-sm)' }}
+                          onClick={() => removeMut.mutate({ companiaId, espId: row.id })}
+                          disabled={removeMut.isPending}
+                        >
+                          Quitar
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+// ─── BaremosPanel ─────────────────────────────────────────────────────────────
 
 function BaremosPanel({ companiaId }: { companiaId: string }) {
   const { data: res, isLoading } = useBaremos({ compania_id: companiaId });
@@ -124,9 +308,11 @@ function BaremosPanel({ companiaId }: { companiaId: string }) {
   );
 }
 
+// ─── TramitadoresPanel ────────────────────────────────────────────────────────
+
 function TramitadoresPanel({ companiaId }: { companiaId: string }) {
   const { data: asignadosRes, isLoading } = useCompaniaTramitadores(companiaId);
-  const { data: todosRes } = useAllTramitadores();
+  const { data: todosRes }                = useAllTramitadores();
   const addMut    = useAddCompaniaTramitador();
   const removeMut = useRemoveCompaniaTramitador();
   const [selectedId, setSelectedId] = useState('');
@@ -206,7 +392,7 @@ function TramitadoresPanel({ companiaId }: { companiaId: string }) {
   );
 }
 
-// ─── Edit / Create Modal ───────────────────────────────────────────────────────
+// ─── EditModal ────────────────────────────────────────────────────────────────
 
 interface EditModalProps {
   compania: Compania | null;
@@ -297,6 +483,31 @@ function EditModal({ compania, onClose, onSave, isPending, error }: EditModalPro
                     onChange={e => setField('cif', e.target.value)}
                     placeholder="A12345678"
                   />
+                </div>
+                <div className="form-group-v2">
+                  <label className="form-label">Tipo de entidad</label>
+                  <select
+                    className="form-control"
+                    value={form.tipo}
+                    onChange={e => setField('tipo', e.target.value as CompaniaTipo)}
+                  >
+                    {TIPOS.map(t => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group-v2">
+                  <label className="form-label">Sistema de integración</label>
+                  <select
+                    className="form-control"
+                    value={form.sistema_integracion}
+                    onChange={e => setField('sistema_integracion', e.target.value as CompaniaSistema | '')}
+                  >
+                    <option value="">— Sin integración —</option>
+                    {SISTEMAS.map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -442,7 +653,10 @@ const SECTIONS: { key: Section; label: string }[] = [
 ];
 
 export function CompaniasPage() {
-  const { data: res, isLoading } = useAllCompanias();
+  const [filterSistema, setFilterSistema] = useState<CompaniaSistema | ''>('');
+  const { data: res, isLoading } = useAllCompanias(
+    filterSistema ? { sistema_integracion: filterSistema } : undefined,
+  );
   const createMut = useCreateCompania();
   const updateMut = useUpdateCompania();
 
@@ -479,11 +693,13 @@ export function CompaniasPage() {
   const handleSave = (form: CompaniaForm) => {
     setSaveError(null);
     const payload = {
-      nombre: form.nombre.trim(),
-      codigo: form.codigo.trim(),
-      cif:    form.cif.trim() || null,
-      activa: form.activa,
-      config: form.config,
+      nombre:              form.nombre.trim(),
+      codigo:              form.codigo.trim(),
+      cif:                 form.cif.trim() || null,
+      activa:              form.activa,
+      tipo:                form.tipo,
+      sistema_integracion: form.sistema_integracion || null,
+      config:              form.config,
     };
 
     if (editCompania === 'nueva') {
@@ -527,6 +743,17 @@ export function CompaniasPage() {
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
+        <select
+          className="form-control"
+          style={{ width: 200 }}
+          value={filterSistema}
+          onChange={e => setFilterSistema(e.target.value as CompaniaSistema | '')}
+        >
+          <option value="">Todos los sistemas</option>
+          {SISTEMAS.map(s => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
         <span className="compania-count">
           {sorted.length} registro{sorted.length !== 1 ? 's' : ''}
         </span>
@@ -536,8 +763,8 @@ export function CompaniasPage() {
       <div className="compania-list">
         {sorted.length === 0 && (
           <div className="compania-empty">
-            {search
-              ? `Sin resultados para "${search}"`
+            {search || filterSistema
+              ? 'Sin resultados para los filtros aplicados.'
               : 'No hay compañías registradas. Crea la primera.'}
           </div>
         )}
@@ -554,6 +781,16 @@ export function CompaniasPage() {
                 <div className="compania-row__info">
                   <span className="compania-row__nombre">{c.nombre}</span>
                   <span className="compania-row__codigo">({c.codigo})</span>
+                  {c.sistema_integracion && (
+                    <span className="compania-badge compania-badge--sistema">
+                      {c.sistema_integracion}
+                    </span>
+                  )}
+                  {c.tipo !== 'compania' && (
+                    <span className="compania-badge compania-badge--tipo">
+                      {TIPOS.find(t => t.value === c.tipo)?.label ?? c.tipo}
+                    </span>
+                  )}
                   {!c.activa && (
                     <span className="compania-badge compania-badge--off">Inactiva</span>
                   )}
@@ -601,16 +838,14 @@ export function CompaniasPage() {
                   </div>
 
                   <div className="cpanel__body">
+                    {expanded.section === 'especialidades' && (
+                      <EspecialidadesPanel companiaId={c.id} />
+                    )}
                     {expanded.section === 'baremos' && (
                       <BaremosPanel companiaId={c.id} />
                     )}
                     {expanded.section === 'tramitadores' && (
                       <TramitadoresPanel companiaId={c.id} />
-                    )}
-                    {expanded.section === 'especialidades' && (
-                      <div className="cpanel__placeholder">
-                        Gestión de especialidades por compañía — disponible próximamente.
-                      </div>
                     )}
                     {expanded.section === 'plantillas' && (
                       <div className="cpanel__placeholder">

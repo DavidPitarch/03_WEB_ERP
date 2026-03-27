@@ -76,12 +76,38 @@ export interface Asegurado {
   created_at: string;
 }
 
+export type CompaniaTipo = 'compania' | 'correduria' | 'administrador_fincas';
+
+export type CompaniaSistema =
+  | 'ADMINISTRADOR_FINCA' | 'ASITUR' | 'FAMAEX' | 'FUNCIONA' | 'GENERALI'
+  | 'IMA' | 'RNET_EMAIL' | 'LAGUNARO' | 'LDWEB' | 'MULTIASISTENCIA_WS'
+  | 'MUTUA' | 'NINGUNO' | 'PAP' | 'PELAYO' | 'SICI' | 'VERYFICA';
+
+export interface CompaniaEspecialidad {
+  id: string;
+  compania_id: string;
+  especialidad_id: string;
+  dias_caducidad: number;
+  dias_caducidad_confirmar: number;
+  created_at: string;
+  updated_at: string;
+  especialidades?: {
+    id: string;
+    nombre: string;
+    codigo: string | null;
+    activa: boolean;
+    orden: number;
+  };
+}
+
 export interface Compania {
   id: string;
   nombre: string;
   codigo: string;
   cif?: string | null;
   activa: boolean;
+  tipo: CompaniaTipo;
+  sistema_integracion?: CompaniaSistema | null;
   config: Record<string, unknown>;
   created_at: string;
 }

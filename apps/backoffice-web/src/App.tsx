@@ -81,7 +81,7 @@ export function App() {
   return (
     <Routes>
       <Route element={<AppLayout />}>
-        <Route index element={<Navigate to="/expedientes" replace />} />
+        <Route index element={<Navigate to="/dashboard" replace />} />
 
         {/* Operaciones */}
         <Route path="/expedientes" element={<ExpedientesPage />} />
@@ -184,7 +184,7 @@ export function App() {
         <Route path="/control/documentos" element={<PlaceholderPage moduleName="Documentos" description="Gestión documental centralizada sobre Supabase Storage con permisos por rol." status="new" />} />
         <Route path="/control/auditoria"  element={<PlaceholderPage moduleName="Auditoría" description="Log de auditoría transversal. El servicio audit.ts ya existe en el backend." status="partial" />} />
       </Route>
-      <Route path="*" element={<Navigate to="/expedientes" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }

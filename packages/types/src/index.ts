@@ -80,6 +80,7 @@ export interface Compania {
   id: string;
   nombre: string;
   codigo: string;
+  cif?: string | null;
   activa: boolean;
   config: Record<string, unknown>;
   created_at: string;

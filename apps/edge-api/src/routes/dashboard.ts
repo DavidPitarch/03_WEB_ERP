@@ -297,6 +297,117 @@ dashboardRoutes.get('/facturacion/export', async (c) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// GET /dashboard/companias/kpis-mes — KPIs por compañía del mes en curso
+// ═══════════════════════════════════════════════════════════════════════════
+dashboardRoutes.get('/companias/kpis-mes', async (c) => {
+  const supabase = c.get('supabase');
+
+  const now = new Date();
+  const mesInicio = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  const mesFin   = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+  const mesInicioTs = `${mesInicio}T00:00:00.000Z`;
+  const mesFinTs    = `${mesFin}T23:59:59.999Z`;
+
+  // 1. Todas las compañías activas
+  const { data: companias, error: compErr } = await supabase
+    .from('companias')
+    .select('id, nombre, codigo, activa')
+    .eq('activa', true)
+    .order('nombre')
+    .limit(500);
+
+  if (compErr) return c.json(err('DB_ERROR', compErr.message), 500);
+  if (!companias || companias.length === 0) return c.json({ data: [], error: null });
+
+  // 2. Queries paralelas para todos los KPIs del mes
+  const [
+    { data: nuevosRows },
+    { data: cerradosRows },
+    { data: enCursoRows },
+    { data: facturaRows },
+  ] = await Promise.all([
+    supabase
+      .from('expedientes')
+      .select('id, compania_id')
+      .gte('created_at', mesInicioTs)
+      .lte('created_at', mesFinTs)
+      .limit(10000),
+    supabase
+      .from('expedientes')
+      .select('compania_id')
+      .eq('estado', 'CERRADO')
+      .gte('updated_at', mesInicioTs)
+      .lte('updated_at', mesFinTs)
+      .limit(10000),
+    supabase
+      .from('expedientes')
+      .select('compania_id')
+      .in('estado', ['NUEVO', 'NO_ASIGNADO', 'EN_PLANIFICACION', 'EN_CURSO', 'PENDIENTE', 'PENDIENTE_MATERIAL', 'PENDIENTE_PERITO', 'PENDIENTE_CLIENTE', 'FINALIZADO'])
+      .limit(10000),
+    supabase
+      .from('facturas')
+      .select('compania_id, base_imponible')
+      .gte('fecha_emision', mesInicio)
+      .lte('fecha_emision', mesFin)
+      .neq('estado', 'anulada')
+      .limit(10000),
+  ]);
+
+  // 3. Coste operario: presupuestos de expedientes creados este mes
+  const expNuevosIds = (nuevosRows ?? []).map((e: any) => e.id);
+  const expIdToComp  = new Map<string, string>(
+    (nuevosRows ?? []).map((e: any) => [e.id as string, e.compania_id as string]),
+  );
+
+  let costeRows: any[] = [];
+  if (expNuevosIds.length > 0) {
+    const { data } = await supabase
+      .from('presupuestos')
+      .select('expediente_id, coste_estimado')
+      .in('expediente_id', expNuevosIds)
+      .limit(10000);
+    costeRows = data ?? [];
+  }
+
+  // 4. Agregar por compañía
+  const nuevosByComp    = ckpiGroupCount(nuevosRows  ?? [], 'compania_id');
+  const cerradosByComp  = ckpiGroupCount(cerradosRows ?? [], 'compania_id');
+  const enCursoByComp   = ckpiGroupCount(enCursoRows  ?? [], 'compania_id');
+  const facturadoByComp = ckpiGroupSum(facturaRows    ?? [], 'compania_id', 'base_imponible');
+
+  const costeByComp = new Map<string, number>();
+  for (const p of costeRows) {
+    const cid = expIdToComp.get(p.expediente_id);
+    if (cid) costeByComp.set(cid, (costeByComp.get(cid) ?? 0) + (p.coste_estimado ?? 0));
+  }
+
+  const data = (companias as any[]).map((comp) => ({
+    compania_id:       comp.id,
+    compania_nombre:   comp.nombre,
+    prefijo:           comp.codigo ?? '',
+    nuevos_mes:        nuevosByComp.get(comp.id)    ?? 0,
+    cerrados_mes:      cerradosByComp.get(comp.id)  ?? 0,
+    en_curso:          enCursoByComp.get(comp.id)   ?? 0,
+    facturado_mes:     r2(facturadoByComp.get(comp.id) ?? 0),
+    coste_operario_mes: r2(costeByComp.get(comp.id)   ?? 0),
+  }));
+
+  return c.json({ data, error: null });
+});
+
+function r2(v: number) { return Math.round(v * 100) / 100; }
+function ckpiGroupCount(rows: any[], key: string): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const r of rows) { const v = r[key]; if (v) m.set(v, (m.get(v) ?? 0) + 1); }
+  return m;
+}
+function ckpiGroupSum(rows: any[], key: string, sum: string): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const r of rows) { const k = r[key]; if (k) m.set(k, (m.get(k) ?? 0) + (r[sum] ?? 0)); }
+  return m;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // GET /dashboard/facturacion — Extended invoice reporting
 // ═══════════════════════════════════════════════════════════════════════════
 dashboardRoutes.get('/facturacion', async (c) => {

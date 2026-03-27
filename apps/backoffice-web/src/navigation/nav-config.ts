@@ -108,6 +108,14 @@ export const NAV_GROUPS: NavGroup[] = [
     defaultOpen: true,
     entries: [
       {
+        id: 'dashboard',
+        label: 'Dashboard',
+        path: '/dashboard',
+        icon: 'LayoutDashboard',
+        status: 'implemented',
+        description: 'Panel de mando con KPIs operativos y financieros',
+      },
+      {
         id: 'siniestros',
         label: 'Siniestros',
         path: '/expedientes',
@@ -597,15 +605,6 @@ export const NAV_GROUPS: NavGroup[] = [
     defaultOpen: false,
     roles: REPORTING_ROLES,
     entries: [
-      {
-        id: 'dashboard',
-        label: 'Dashboard',
-        path: '/dashboard',
-        icon: 'BarChart2',
-        roles: REPORTING_ROLES,
-        status: 'implemented',
-        description: 'Panel de mando con KPIs operativos y financieros',
-      },
       {
         id: 'rentabilidad',
         label: 'Rentabilidad',

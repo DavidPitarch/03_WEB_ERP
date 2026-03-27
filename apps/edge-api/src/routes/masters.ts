@@ -11,13 +11,95 @@ export const mastersRoutes = new Hono<{ Bindings: Env }>();
 mastersRoutes.get('/companias', async (c) => {
   const supabase = c.get('supabase');
   const activa = c.req.query('activa');
+  const search = c.req.query('search');
 
   let query = supabase.from('companias').select('*').order('nombre');
   if (activa === 'true') query = query.eq('activa', true);
+  if (search) query = query.or(`nombre.ilike.%${search}%,codigo.ilike.%${search}%`);
 
   const { data, error } = await query;
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
   return c.json({ data, error: null });
+});
+
+mastersRoutes.get('/companias/:id', async (c) => {
+  const supabase = c.get('supabase');
+  const id = c.req.param('id');
+  const { data, error } = await supabase.from('companias').select('*').eq('id', id).single();
+  if (error || !data) return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Compañía no encontrada' } }, 404);
+  return c.json({ data, error: null });
+});
+
+// ── Tramitadores vinculados a una compañía ──────────────────────────────────
+
+mastersRoutes.get('/companias/:id/tramitadores', async (c) => {
+  const supabase = c.get('supabase');
+  const id = c.req.param('id');
+
+  const { data, error } = await supabase
+    .from('tramitadores')
+    .select('id, nombre, apellidos, email, activo, companias_preferentes')
+    .contains('companias_preferentes', [id])
+    .order('nombre');
+
+  if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+  return c.json({ data: data ?? [], error: null });
+});
+
+mastersRoutes.post('/companias/:id/tramitadores', async (c) => {
+  const supabase = c.get('supabase');
+  const companiaId = c.req.param('id');
+  const body = await c.req.json();
+  const tramitadorId = body.tramitador_id;
+
+  if (!tramitadorId) {
+    return c.json({ data: null, error: { code: 'VALIDATION', message: 'tramitador_id requerido' } }, 422);
+  }
+
+  const { data: tram, error: e1 } = await supabase
+    .from('tramitadores')
+    .select('id, companias_preferentes')
+    .eq('id', tramitadorId)
+    .single();
+
+  if (e1 || !tram) return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Tramitador no encontrado' } }, 404);
+
+  const current: string[] = tram.companias_preferentes ?? [];
+  if (current.includes(companiaId)) return c.json({ data: tram, error: null });
+
+  const { data, error } = await supabase
+    .from('tramitadores')
+    .update({ companias_preferentes: [...current, companiaId] })
+    .eq('id', tramitadorId)
+    .select('id, nombre, apellidos, email, activo')
+    .single();
+
+  if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+  return c.json({ data, error: null }, 201);
+});
+
+mastersRoutes.delete('/companias/:id/tramitadores/:tramitadorId', async (c) => {
+  const supabase = c.get('supabase');
+  const companiaId = c.req.param('id');
+  const tramitadorId = c.req.param('tramitadorId');
+
+  const { data: tram, error: e1 } = await supabase
+    .from('tramitadores')
+    .select('id, companias_preferentes')
+    .eq('id', tramitadorId)
+    .single();
+
+  if (e1 || !tram) return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Tramitador no encontrado' } }, 404);
+
+  const nuevas = (tram.companias_preferentes ?? []).filter((cid: string) => cid !== companiaId);
+
+  const { error } = await supabase
+    .from('tramitadores')
+    .update({ companias_preferentes: nuevas })
+    .eq('id', tramitadorId);
+
+  if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+  return c.json({ data: { deleted: true }, error: null });
 });
 
 mastersRoutes.post('/companias', async (c) => {

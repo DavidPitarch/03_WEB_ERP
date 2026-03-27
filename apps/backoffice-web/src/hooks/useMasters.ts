@@ -2,6 +2,45 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { Compania, Operario, Asegurado, EmpresaFacturadora } from '@erp/types';
 
+// ─── Tramitadores by company ───────────────────────────────────────────────────
+
+export function useCompaniaTramitadores(companiaId: string | null) {
+  return useQuery({
+    queryKey: ['compania-tramitadores', companiaId],
+    queryFn: () => api.get<any[]>(`/masters/companias/${companiaId}/tramitadores`),
+    enabled: !!companiaId,
+  });
+}
+
+export function useAllTramitadores() {
+  return useQuery({
+    queryKey: ['tramitadores-all'],
+    queryFn: () => api.get<any[]>('/tramitadores?activo=true'),
+  });
+}
+
+export function useAddCompaniaTramitador() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ companiaId, tramitadorId }: { companiaId: string; tramitadorId: string }) =>
+      api.post<any>(`/masters/companias/${companiaId}/tramitadores`, { tramitador_id: tramitadorId }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['compania-tramitadores', vars.companiaId] });
+    },
+  });
+}
+
+export function useRemoveCompaniaTramitador() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ companiaId, tramitadorId }: { companiaId: string; tramitadorId: string }) =>
+      api.del<any>(`/masters/companias/${companiaId}/tramitadores/${tramitadorId}`),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['compania-tramitadores', vars.companiaId] });
+    },
+  });
+}
+
 export function useCompanias() {
   return useQuery({
     queryKey: ['companias'],

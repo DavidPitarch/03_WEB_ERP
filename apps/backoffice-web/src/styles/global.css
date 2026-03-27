@@ -695,16 +695,168 @@ a:hover { text-decoration: underline; }
 .kpi-value-danger { color: var(--red-600); }
 .dashboard-tables { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-top: var(--space-4); }
 .dashboard-tables h3 { font-size: var(--text-md); font-weight: var(--weight-semibold); margin-bottom: var(--space-3); color: var(--color-text-primary); }
-.dashboard-section { background: var(--color-surface); border: 1px solid var(--color-border-default); border-radius: var(--radius-lg); padding: var(--space-5); box-shadow: var(--shadow-xs); }
+.dashboard-section { background: var(--color-surface); border: 1px solid var(--color-border-default); border-radius: var(--radius-lg); padding: var(--space-5); box-shadow: var(--shadow-xs); margin-bottom: var(--space-4); }
 .rent-row-deficit { background: rgba(239,68,68,.04); }
 .rent-negative { color: var(--red-600); font-weight: var(--weight-semibold); }
 .rent-positive { color: var(--green-700); font-weight: var(--weight-semibold); }
 .totals-row { font-weight: var(--weight-bold); background: var(--color-bg-subtle); border-top: 2px solid var(--color-border-strong); }
 .row-danger { background: rgba(239,68,68,.04); }
+
+/* ─── DASHBOARD — mes header & KPI strip ─── */
+.dashboard-mes-header { display: flex; align-items: center; justify-content: space-between; }
+.mes-badge {
+  display: inline-flex; align-items: center;
+  padding: 3px var(--space-3);
+  background: var(--color-accent); color: #fff;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs); font-weight: var(--weight-semibold);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.dashboard-kpi-strip { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.kpi-chip {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  white-space: nowrap;
+}
+.kpi-chip__icon { color: var(--color-text-tertiary); flex-shrink: 0; }
+.kpi-chip__value { font-size: var(--text-md); font-weight: var(--weight-bold); line-height: 1.2; color: var(--color-text-primary); }
+.kpi-chip__label { font-size: 10px; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 1px; }
+.kpi-chip--warning { border-color: var(--amber-200); background: var(--amber-50); }
+.kpi-chip--warning .kpi-chip__value { color: var(--amber-700); }
+.kpi-chip--danger  { border-color: var(--red-200);   background: var(--red-50); }
+.kpi-chip--danger  .kpi-chip__value { color: var(--red-700); }
+.kpi-chip--success { border-color: var(--green-100); }
+.kpi-chip--success .kpi-chip__value { color: var(--green-700); }
+.kpi-chip--info    { border-color: var(--blue-100); }
+.kpi-chip--info    .kpi-chip__value { color: var(--blue-700); }
+[data-theme="dark"] .kpi-chip--warning { background: color-mix(in srgb, var(--amber-500) 10%, transparent); border-color: color-mix(in srgb, var(--amber-500) 30%, transparent); }
+[data-theme="dark"] .kpi-chip--danger  { background: color-mix(in srgb, var(--red-500)   10%, transparent); border-color: color-mix(in srgb, var(--red-500)   30%, transparent); }
+[data-theme="dark"] .kpi-chip--success { background: color-mix(in srgb, var(--green-500) 10%, transparent); border-color: color-mix(in srgb, var(--green-500) 30%, transparent); }
+[data-theme="dark"] .kpi-chip--info    { background: color-mix(in srgb, var(--blue-500)  10%, transparent); border-color: color-mix(in srgb, var(--blue-500)  30%, transparent); }
+
+/* ─── DASHBOARD — section header ─── */
+.section-header { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-3); }
+.section-header h3 { font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--color-text-primary); }
+.section-meta { font-size: var(--text-xs); color: var(--color-text-tertiary); }
+
+/* ─── CKPI TABLE — Listado denso de compañías con KPIs ─── */
+.ckpi-table {
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  font-size: var(--text-xs);
+}
+.ckpi-header, .ckpi-row {
+  display: grid;
+  /* prefijo | nombre | nuevos | cerrados | facturado | coste | activos */
+  grid-template-columns: 72px 1fr 68px 68px 120px 120px 68px;
+  align-items: center;
+  min-height: 32px;
+}
+.ckpi-header {
+  background: var(--color-bg-subtle);
+  border-bottom: 2px solid var(--color-border-default);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.ckpi-row {
+  border-bottom: 1px solid var(--color-border-default);
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.08s;
+  cursor: pointer;
+}
+.ckpi-row:last-child { border-bottom: none; }
+.ckpi-row:hover { background: var(--color-bg-subtle); }
+.ckpi-row--total {
+  background: var(--color-bg-subtle);
+  border-top: 2px solid var(--color-border-strong) !important;
+  border-bottom: none !important;
+  cursor: default;
+}
+.ckpi-row--skeleton { cursor: default; animation: none; }
+.ckpi-cell {
+  padding: var(--space-2) var(--space-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ckpi-header .ckpi-cell {
+  font-size: 10px;
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-tertiary);
+  padding: var(--space-1) var(--space-2);
+}
+.ckpi-cell--prefijo { padding-left: var(--space-3); }
+.ckpi-cell--name    { padding-left: var(--space-2); }
+.ckpi-cell--num     { text-align: right; }
+.ckpi-cell--money   { text-align: right; font-family: var(--font-mono); font-size: 11px; }
+
+/* Prefix chip */
+.ckpi-prefijo {
+  display: inline-block;
+  padding: 1px var(--space-1);
+  border-radius: 3px;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border-default);
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Company name */
+.ckpi-nombre { color: var(--color-text-primary); font-weight: var(--weight-medium); }
+.ckpi-row--total .ckpi-nombre { font-weight: var(--weight-bold); font-size: var(--text-xs); letter-spacing: 0.04em; }
+
+/* Number chips */
+.ckpi-num {
+  display: inline-block;
+  font-weight: var(--weight-semibold);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.ckpi-num--blue   { color: var(--blue-600);   }
+.ckpi-num--green  { color: var(--green-600);  }
+.ckpi-num--amber  { color: var(--amber-600);  }
+.ckpi-num--red    { color: var(--red-600);    }
+.ckpi-num--zero   { color: var(--color-text-tertiary); }
+[data-theme="dark"] .ckpi-num--blue  { color: var(--blue-400);  }
+[data-theme="dark"] .ckpi-num--green { color: var(--green-400); }
+[data-theme="dark"] .ckpi-num--amber { color: var(--amber-400); }
+
+/* Money values */
+.ckpi-money { color: var(--green-700); font-weight: var(--weight-medium); }
+.ckpi-cost  { color: var(--color-text-secondary); font-weight: var(--weight-medium); }
+[data-theme="dark"] .ckpi-money { color: var(--green-400); }
+
+/* Skeleton loader */
+.ckpi-skel {
+  height: 10px;
+  border-radius: 3px;
+  background: var(--color-bg-subtle);
+  animation: pulse 1.4s ease-in-out infinite;
+  display: inline-block;
+  min-width: 20px;
+}
+
 @media (max-width: 768px) {
   .dashboard-grid   { grid-template-columns: repeat(2, 1fr); }
   .dashboard-tables { grid-template-columns: 1fr; }
   .kanban-board     { grid-template-columns: repeat(2, 1fr); }
+  .ckpi-header, .ckpi-row { grid-template-columns: 56px 1fr 44px 44px 90px 44px; }
+  .ckpi-cell--money:nth-child(6) { display: none; } /* ocultar coste en móvil */
 }
 
 /* ─── PRESUPUESTO ─── */

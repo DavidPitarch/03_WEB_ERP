@@ -40,7 +40,7 @@ export function AppLayout() {
             {sidebarOpen ? <X size={16} /> : <Menu size={16} />}
           </button>
 
-          <Link to="/expedientes" className="logo">ERP Siniestros</Link>
+          <Link to="/dashboard" className="logo">ERP Siniestros</Link>
         </div>
 
         <GlobalSearch />

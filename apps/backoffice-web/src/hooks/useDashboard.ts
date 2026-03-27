@@ -46,6 +46,14 @@ export function useProductividad() {
   });
 }
 
+export function useCompaniasKpisMes() {
+  return useQuery({
+    queryKey: ['dashboard-companias-kpis-mes'],
+    queryFn: () => api.get('/dashboard/companias/kpis-mes'),
+    refetchInterval: 60_000,
+  });
+}
+
 export function useFacturacionReporting(filters: Record<string, any> = {}) {
   return useQuery({
     queryKey: ['dashboard-facturacion', filters],

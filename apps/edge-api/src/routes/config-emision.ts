@@ -604,8 +604,8 @@ configEmisionRoutes.put('/configuracion/:empresa_id', async (c) => {
   await sb.from('config_emision_historial').insert({
     empresa_facturadora_id: empresa_id,
     version_numero: nuevaVersion,
-    cambios: actual ?? {},
-    cambios: data,
+    datos_anteriores: actual ?? {},
+    datos_nuevos: data,
     motivo_cambio: motivo_cambio ?? null,
     actor_id: user.id,
   });

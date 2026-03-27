@@ -749,7 +749,7 @@ bancosRoutes.post('/movimientos', async (c) => {
     .from('movimientos_bancarios')
     .insert({
       cuenta_id:       body.cuenta_id,
-      fecha_accion: body.fecha_operacion,
+      fecha_accion: body.fecha_accion,
       fecha_valor:     body.fecha_valor,
       concepto_banco:  body.concepto_banco,
       importe:         body.importe,
@@ -770,7 +770,7 @@ bancosRoutes.post('/movimientos', async (c) => {
     registro_id: data.id,
     accion: 'INSERT',
     actor_id: user.id,
-    cambios: { cuenta_id: body.cuenta_id, fecha_accion: body.fecha_operacion, importe: body.importe },
+    cambios: { cuenta_id: body.cuenta_id, fecha_accion: body.fecha_accion, importe: body.importe },
   });
 
   return c.json({ data, error: null }, 201);

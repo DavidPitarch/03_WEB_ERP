@@ -7,7 +7,7 @@ export async function insertAudit(
     registro_id: string;
     accion: 'INSERT' | 'UPDATE' | 'DELETE';
     actor_id: string;
-    cambios: Record<string, unknown>;
+    cambios?: Record<string, unknown>;
     ip?: string;
   }
 ) {
@@ -16,7 +16,7 @@ export async function insertAudit(
     registro_id: params.registro_id,
     accion: params.accion,
     actor_id: params.actor_id,
-    cambios: params.cambios,
+    cambios: params.cambios ?? {},
     ip: params.ip ?? null,
   });
 }

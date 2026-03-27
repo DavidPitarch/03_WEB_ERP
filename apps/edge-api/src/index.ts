@@ -49,6 +49,8 @@ import { centralitaRoutes } from './routes/centralita';
 import { lineasFacturacionRoutes } from './routes/lineas-facturacion';
 import { encuestasRoutes } from './routes/encuestas';
 import { eventosRoutes } from './routes/eventos';
+import { plantillasDocumentoRoutes } from './routes/plantillas-documento';
+import { gruposCamposRoutes } from './routes/grupos-campos';
 import { authMiddleware } from './middleware/auth';
 import { requireRoles } from './middleware/roles';
 import { OFFICE_ROLES, OPERATOR_ROLES, PERITO_ROUTE_ROLES, VIDEOPERITACION_ROLES } from './security/role-groups';
@@ -207,6 +209,8 @@ protectRouteGroup('/centralita', requireRoles(['admin', 'supervisor', 'tramitado
 protectRouteGroup('/lineas-facturacion', requireRoles(['admin', 'supervisor', 'tramitador', 'financiero']));
 protectRouteGroup('/encuestas', requireRoles(['admin', 'supervisor']));
 protectRouteGroup('/eventos', requireRoles(['admin', 'supervisor']));
+protectRouteGroup('/plantillas-documento', requireRoles(['admin', 'supervisor']));
+protectRouteGroup('/grupos-campos', requireRoles(['admin', 'supervisor']));
 api.use('/facturas/:id/registrar-cobro', requireRoles(['admin', 'financiero']));
 api.use('/facturas/:id/registrar-cobro/*', requireRoles(['admin', 'financiero']));
 api.route('/expedientes', expedientesRoutes);
@@ -256,6 +260,8 @@ api.route('/centralita', centralitaRoutes);
 api.route('/lineas-facturacion', lineasFacturacionRoutes);
 api.route('/encuestas', encuestasRoutes);
 api.route('/eventos', eventosRoutes);
+api.route('/plantillas-documento', plantillasDocumentoRoutes);
+api.route('/grupos-campos', gruposCamposRoutes);
 
 app.route('/api/v1', api);
 

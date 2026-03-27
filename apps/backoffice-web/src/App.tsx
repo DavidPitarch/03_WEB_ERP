@@ -73,6 +73,8 @@ import { RgpdPage } from '@/pages/RgpdPage';
 import { AutoVisitasPage } from '@/pages/AutoVisitasPage';
 import { CentralitaPage } from '@/pages/CentralitaPage';
 import { LineasFacturacionPage } from '@/pages/LineasFacturacionPage';
+import { GestionDocumentosPage } from '@/pages/GestionDocumentosPage';
+import { GestionCamposPage } from '@/pages/GestionCamposPage';
 
 export function App() {
   const { user, loading } = useAuth();
@@ -196,6 +198,8 @@ export function App() {
         <Route path="/auto-visitas" element={<AutoVisitasPage />} />
         <Route path="/centralita" element={<CentralitaPage />} />
         <Route path="/lineas-facturacion" element={<LineasFacturacionPage />} />
+        <Route path="/control/documentos" element={<GestionDocumentosPage />} />
+        <Route path="/control/campos" element={<GestionCamposPage />} />
 
         {/* Perfil de usuario */}
         <Route path="/perfil" element={<PerfilPage />} />

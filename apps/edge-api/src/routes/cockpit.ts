@@ -192,7 +192,7 @@ cockpitRoutes.get('/counts', async (c) => {
     supabase
       .from('expedientes')
       .select('id', { count: 'exact', head: true })
-      .in('estado', ['NO_ASIGNADO', 'EN_PLANIFICACION']),
+      .in('estado', ['NUEVO', 'NO_ASIGNADO']),
     supabase
       .from('alertas')
       .select('id', { count: 'exact', head: true })

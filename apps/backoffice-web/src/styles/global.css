@@ -20,16 +20,22 @@ body {
 a { color: var(--color-text-link); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-/* ─── APP SHELL LAYOUT (sidebar + header) ─── */
+/* ─── APP SHELL LAYOUT (sidebar + header + cockpit) ─── */
 .app-layout {
-  min-height: 100vh;
+  height: 100vh;
   display: grid;
-  grid-template-rows: var(--header-height) 1fr;
+  grid-template-rows: var(--header-height) auto 1fr;
   grid-template-columns: var(--sidebar-width) 1fr;
   grid-template-areas:
-    "header header"
+    "header  header"
+    "cockpit cockpit"
     "sidebar main";
   background: var(--color-bg-base);
+}
+
+/* ─── COCKPIT (franja entre header y contenido) ─── */
+.app-cockpit {
+  grid-area: cockpit;
 }
 
 /* ─── HEADER ─── */
@@ -216,8 +222,10 @@ a:hover { text-decoration: underline; }
 @media (max-width: 1023px) {
   .app-layout {
     grid-template-columns: 1fr;
+    grid-template-rows: var(--header-height) auto 1fr;
     grid-template-areas:
       "header"
+      "cockpit"
       "main";
   }
   .app-main { padding: var(--space-4); }

@@ -53,11 +53,13 @@ export function AppLayout() {
       {/* ── SIDEBAR ── */}
       <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
+      {/* ── COCKPIT OPERATIVO — franja fija entre header y contenido ── */}
+      <div className="app-cockpit">
+        <TopCockpit collapsed={cockpitCollapsed} onToggle={toggleCockpit} />
+      </div>
+
       {/* ── CONTENIDO PRINCIPAL ── */}
       <main className="app-main">
-        {/* Cockpit operativo — sticky bajo el header */}
-        <TopCockpit collapsed={cockpitCollapsed} onToggle={toggleCockpit} />
-
         {/* Alertas del sistema */}
         <AlertBanner />
 

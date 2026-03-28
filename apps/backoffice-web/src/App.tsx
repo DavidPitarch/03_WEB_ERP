@@ -116,7 +116,7 @@ export function App() {
         <Route path="/partes-validacion" element={<PartesValidacionPage />} />
         <Route path="/informes-caducados" element={<InformesCaducadosPage />} />
         <Route path="/solicitudes" element={<SolicitudesPage />} />
-        <Route path="/asignaciones" element={<AsignacionesPage />} />
+        <Route path="/asignaciones" element={<ColaAsignacionPage />} />
         <Route path="/trabajos-pendientes" element={<TrabajosPendientesPage />} />
 
         {/* Planning */}

@@ -491,7 +491,21 @@ facturasRoutes.post('/emitir', async (c) => {
     }),
   ]);
 
-  // 9. Return factura
+  // 9. Enqueue email fanout (best-effort — does not block the response)
+  if (c.env.DOMAIN_EVENTS_QUEUE) {
+    c.env.DOMAIN_EVENTS_QUEUE.send({
+      type: 'domain_event_fanout',
+      event_type: 'FacturaEmitida',
+      aggregate_id: factura.id,
+      aggregate_type: 'factura',
+      payload: { numero_factura, total, expediente_id: body.expediente_id },
+      actor_id: user.id,
+    }).catch((err: unknown) => {
+      console.error('[facturas] Queue send failed:', err instanceof Error ? err.message : err);
+    });
+  }
+
+  // 10. Return factura
   return c.json({ data: factura, error: null }, 201);
 });
 

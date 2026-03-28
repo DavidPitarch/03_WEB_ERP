@@ -129,12 +129,12 @@ expedientesRoutes.post('/', async (c) => {
     try {
       const sugerencias = await suggestTramitador(
         {
-          id:                    data.id,
-          compania_id:           data.compania_id,
-          tipo_siniestro:        data.tipo_siniestro,
-          prioridad:             data.prioridad,
-          codigo_postal:         data.codigo_postal,
-          empresa_facturadora_id: data.empresa_facturadora_id,
+          id:                    (data as any).id,
+          compania_id:           (data as any).compania_id,
+          tipo_siniestro:        (data as any).tipo_siniestro,
+          prioridad:             (data as any).prioridad,
+          codigo_postal:         (data as any).codigo_postal,
+          empresa_facturadora_id: (data as any).empresa_facturadora_id,
         },
         supabase,
         1,

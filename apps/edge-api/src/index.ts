@@ -59,6 +59,7 @@ import { requireRoles } from './middleware/roles';
 import { checkRateLimit } from './services/rate-limiter';
 import { OFFICE_ROLES, OPERATOR_ROLES, PERITO_ROUTE_ROLES, VIDEOPERITACION_ROLES } from './security/role-groups';
 import { scheduled } from './scheduled';
+import { queue } from './queue';
 import type { Env } from './types';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -293,5 +294,10 @@ api.route('/siniestros', siniestrosRoutes);
 
 app.route('/api/v1', api);
 
-export default app;
-export { scheduled };
+// Module worker export — Cloudflare Workers resolves fetch, scheduled, and queue
+// from the default export when it is a plain object.
+export default {
+  fetch: app.fetch.bind(app),
+  scheduled,
+  queue,
+};

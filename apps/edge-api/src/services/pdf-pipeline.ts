@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { insertAudit, insertDomainEvent } from './audit';
+import type { QueueMsg } from '../queue';
 
 /**
  * PDF Pipeline — Stub para generación de documentos PDF.
@@ -16,17 +17,12 @@ import { insertAudit, insertDomainEvent } from './audit';
  */
 
 /**
- * ESTADO: STUB — NO OPERATIVO EN PRODUCCIÓN
+ * Encola la generación del documento HTML para un parte validado.
  *
- * Este pipeline crea el registro del documento en la tabla `documentos`
- * con estado 'pendiente', pero NO genera ningún archivo PDF.
- * El campo `_stub: true` de la respuesta señala este estado a los consumidores.
- *
- * El PDF real requiere un worker procesador (Cloudflare Queue o Supabase Edge Function)
- * que está pendiente de implementación en P3.1 del plan de remediación.
- *
- * Impacto en demo: mostrar al usuario el banner "PDF pendiente" en lugar
- * de un link de descarga. Ver PartesValidacionPage.tsx.
+ * Si se proporciona el binding `domainEventsQueue` (disponible en demo/prod),
+ * envía un mensaje al worker queue que genera el documento de forma asíncrona.
+ * Sin el binding (entorno local sin queue), registra el documento en estado
+ * 'pendiente' y retorna `_stub: true` como antes.
  */
 export async function enqueuePartePdf(
   supabase: SupabaseClient,
@@ -35,8 +31,9 @@ export async function enqueuePartePdf(
     parte_id: string;
     actor_id: string;
     numero_expediente: string;
-  }
-): Promise<{ documento_id: string | null; error: string | null; _stub: true }> {
+  },
+  domainEventsQueue?: Queue<QueueMsg>
+): Promise<{ documento_id: string | null; error: string | null; _stub: boolean }> {
   const storagePath = `documentos/${params.expediente_id}/parte_${params.parte_id}.pdf`;
   const nombre = `Parte_${params.numero_expediente}_${new Date().toISOString().split('T')[0]}.pdf`;
 
@@ -79,6 +76,19 @@ export async function enqueuePartePdf(
       actor_id: params.actor_id,
     }),
   ]);
+
+  // If the queue binding is available, dispatch the async generation job
+  if (domainEventsQueue) {
+    await domainEventsQueue.send({
+      type: 'generate_pdf',
+      parte_id: params.parte_id,
+      expediente_id: params.expediente_id,
+      documento_id: data.id,
+      actor_id: params.actor_id,
+      numero_expediente: params.numero_expediente,
+    });
+    return { documento_id: data.id, error: null, _stub: false };
+  }
 
   return { documento_id: data.id, error: null, _stub: true };
 }

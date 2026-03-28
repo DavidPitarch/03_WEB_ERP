@@ -10,7 +10,8 @@ export interface Env {
   CUSTOMER_PORTAL_URL?: string;
   /** KV namespace para rate limiting distribuido. Opcional: sin binding usa fallback in-memory. */
   RATE_LIMIT_KV?: KVNamespace;
-  // DOMAIN_EVENTS_QUEUE: Queue; // descomentar al activar queues
+  /** Cloudflare Queue para procesamiento asíncrono de documentos y notificaciones. */
+  DOMAIN_EVENTS_QUEUE?: Queue;
 }
 
 export interface AuthUser {

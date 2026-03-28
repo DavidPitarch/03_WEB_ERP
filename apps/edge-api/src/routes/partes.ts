@@ -82,12 +82,16 @@ partesRoutes.post('/:id/validar', async (c) => {
 
   // Enqueue PDF generation
   const numeroExpediente = (parte as any).expedientes?.numero_expediente ?? 'SIN-NUM';
-  const pdfResult = await enqueuePartePdf(supabase, {
-    expediente_id: parte.expediente_id,
-    parte_id: id,
-    actor_id: user.id,
-    numero_expediente: numeroExpediente,
-  });
+  const pdfResult = await enqueuePartePdf(
+    supabase,
+    {
+      expediente_id: parte.expediente_id,
+      parte_id: id,
+      actor_id: user.id,
+      numero_expediente: numeroExpediente,
+    },
+    c.env.DOMAIN_EVENTS_QUEUE
+  );
 
   await Promise.all([
     insertAudit(supabase, {

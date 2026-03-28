@@ -15,16 +15,9 @@ compatibility_date = "2024-06-01"
 [vars]
 ENVIRONMENT = "development"
 
-# Queues (descomentar cuando se activen en P3.1 — PDF pipeline real)
-# [[queues.producers]]
-# queue = "domain-events"
-# binding = "DOMAIN_EVENTS_QUEUE"
-#
-# [[queues.consumers]]
-# queue = "domain-events"
-# max_batch_size = 10
-# max_retries = 3
-# dead_letter_queue = "domain-events-dlq"
+# Queues are not active in local dev (wrangler dev has no real queue support).
+# The DOMAIN_EVENTS_QUEUE binding is optional in Env — code falls back to stub mode.
+# To test queues locally: use `wrangler dev --remote` with a real CF account.
 
 # Cron Triggers (watchdogs) — 7:00 y 13:00 UTC
 # Solo se activan en demo y production (ver más abajo)
@@ -54,6 +47,26 @@ ENVIRONMENT = "demo"
 [env.demo.triggers]
 crons = ["0 7 * * *", "0 13 * * *"]
 
+# Queue bindings — demo
+# Create queues first: wrangler queues create domain-events --env demo
+#                      wrangler queues create domain-events-dlq --env demo
+[[env.demo.queues.producers]]
+queue = "domain-events"
+binding = "DOMAIN_EVENTS_QUEUE"
+
+[[env.demo.queues.consumers]]
+queue = "domain-events"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "domain-events-dlq"
+
+[[env.demo.queues.consumers]]
+queue = "domain-events-dlq"
+max_batch_size = 5
+max_batch_timeout = 30
+max_retries = 0
+
 
 # ─── Entorno de producción ───────────────────────────────────────────────────
 # Deploy: wrangler deploy --env production
@@ -76,3 +89,23 @@ ENVIRONMENT = "production"
 
 [env.production.triggers]
 crons = ["0 7 * * *", "0 13 * * *"]
+
+# Queue bindings — production
+# Create queues first: wrangler queues create domain-events --env production
+#                      wrangler queues create domain-events-dlq --env production
+[[env.production.queues.producers]]
+queue = "domain-events"
+binding = "DOMAIN_EVENTS_QUEUE"
+
+[[env.production.queues.consumers]]
+queue = "domain-events"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "domain-events-dlq"
+
+[[env.production.queues.consumers]]
+queue = "domain-events-dlq"
+max_batch_size = 5
+max_batch_timeout = 30
+max_retries = 0

@@ -4,7 +4,7 @@ import type { Env } from '../types';
 
 export const dashboardRoutes = new Hono<{ Bindings: Env }>();
 
-// ─── Helper ────────────────────────────────────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────────────
 function err(code: string, message: string) {
   return { data: null, error: { code, message } };
 }
@@ -15,6 +15,41 @@ function getEmpresaFacturadoraId(c: any) {
 
 function getSerieId(c: any) {
   return c.req.query('serie_id') ?? c.req.query('serie');
+}
+
+// ─── Scope por rol ─────────────────────────────────────────────────────────
+// admin / financiero → todo
+// supervisor         → expedientes de sus companias_preferentes
+// tramitador         → expedientes con tramitador_id = su registro
+
+type UserScope =
+  | { type: 'all' }
+  | { type: 'companias'; companias: string[] }   // supervisor
+  | { type: 'tramitador'; tramitador_id: string | null }; // tramitador
+
+async function getUserScope(c: any): Promise<UserScope> {
+  const user = c.get('user');
+  const supabase = c.get('supabase');
+  const roles: string[] = user.roles ?? [];
+
+  if (roles.includes('admin') || roles.includes('financiero')) {
+    return { type: 'all' };
+  }
+
+  const { data: tram } = await supabase
+    .from('tramitadores')
+    .select('id, companias_preferentes')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (roles.includes('supervisor')) {
+    // Si companias_preferentes está vacío → sin restricción de compañía
+    const companias: string[] = tram?.companias_preferentes ?? [];
+    return { type: 'companias', companias };
+  }
+
+  // tramitador u otro rol office
+  return { type: 'tramitador', tramitador_id: tram?.id ?? null };
 }
 
 function mapDashboardKpis(data: Record<string, any>) {
@@ -62,6 +97,7 @@ function mapFacturacionRow(row: Record<string, any>) {
 // ═══════════════════════════════════════════════════════════════════════════
 dashboardRoutes.get('/kpis', async (c) => {
   const supabase = c.get('supabase');
+  const scope = await getUserScope(c);
   const fecha_desde = c.req.query('fecha_desde');
   const fecha_hasta = c.req.query('fecha_hasta');
   const empresa_facturadora_id = getEmpresaFacturadoraId(c);
@@ -69,23 +105,35 @@ dashboardRoutes.get('/kpis', async (c) => {
 
   const hasFilters = fecha_desde || fecha_hasta || empresa_facturadora_id || compania_id;
 
-  if (!hasFilters) {
-    // Use materialized/plain view for unfiltered KPIs
+  // Vista global solo para admin/financiero sin filtros extra
+  if (!hasFilters && scope.type === 'all') {
     const { data, error } = await supabase
       .from('v_dashboard_kpis')
       .select('*')
       .single();
-
     if (error) return c.json(err('DB_ERROR', error.message), 500);
     return c.json({ data: mapDashboardKpis(data as Record<string, any>), error: null });
   }
 
-  // Filtered: calculate KPIs inline from expedientes
-  let expQuery = supabase.from('expedientes').select('id, estado, created_at, compania_id, empresa_facturadora_id');
+  // Tramitador sin registro → vacío
+  if (scope.type === 'tramitador' && !scope.tramitador_id) {
+    return c.json({ data: mapDashboardKpis({ total_expedientes: 0, en_curso: 0, pendientes: 0, finalizados_sin_factura: 0, total_facturado: 0, total_cobrado: 0, pendiente_cobro: 0, facturas_vencidas: 0, pedidos_caducados: 0, informes_caducados: 0, sin_presupuesto: 0 }), error: null });
+  }
+
+  // Cálculo inline con scope + filtros
+  let expQuery = supabase.from('expedientes').select('id, estado, created_at, compania_id, empresa_facturadora_id, tramitador_id');
   if (fecha_desde) expQuery = expQuery.gte('created_at', fecha_desde);
   if (fecha_hasta) expQuery = expQuery.lte('created_at', fecha_hasta);
   if (empresa_facturadora_id) expQuery = expQuery.eq('empresa_facturadora_id', empresa_facturadora_id);
   if (compania_id) expQuery = expQuery.eq('compania_id', compania_id);
+
+  // Aplicar scope por rol
+  if (scope.type === 'companias' && scope.companias.length > 0) {
+    expQuery = expQuery.in('compania_id', scope.companias);
+  }
+  if (scope.type === 'tramitador' && scope.tramitador_id) {
+    expQuery = expQuery.eq('tramitador_id', scope.tramitador_id);
+  }
 
   const { data: expedientes, error: expErr } = await expQuery;
   if (expErr) return c.json(err('DB_ERROR', expErr.message), 500);
@@ -297,100 +345,181 @@ dashboardRoutes.get('/facturacion/export', async (c) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// GET /dashboard/companias/kpis-mes — KPIs por compañía del mes en curso
+// GET /dashboard/companias/kpis-mes — KPIs por compañía del periodo
+//
+// Params opcionales:
+//   fecha_desde / fecha_hasta — rango (defecto: mes en curso)
+//
+// Scope por rol:
+//   admin/financiero → todas las compañías
+//   supervisor       → solo companias_preferentes
+//   tramitador       → solo compañías donde tiene expedientes asignados
+//
+// La columna "Facturado" usa la misma lógica que /kpis:
+//   expedientes creados en el periodo → suma de sus facturas
+//   (consistente con los KPI chips superiores)
 // ═══════════════════════════════════════════════════════════════════════════
 dashboardRoutes.get('/companias/kpis-mes', async (c) => {
   const supabase = c.get('supabase');
+  const scope = await getUserScope(c);
 
-  const now = new Date();
-  const mesInicio = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-  const mesFin   = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
-  const mesInicioTs = `${mesInicio}T00:00:00.000Z`;
-  const mesFinTs    = `${mesFin}T23:59:59.999Z`;
+  // ── Periodo: params o mes actual por defecto ─────────────────────────────
+  const paramDesde = c.req.query('fecha_desde');
+  const paramHasta = c.req.query('fecha_hasta');
 
-  // 1. Todas las compañías activas
-  const { data: companias, error: compErr } = await supabase
+  let periodoDesde: string;
+  let periodoHasta: string;
+
+  if (paramDesde && paramHasta) {
+    periodoDesde = paramDesde;
+    periodoHasta = paramHasta;
+  } else {
+    const now = new Date();
+    periodoDesde = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    periodoHasta = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+  }
+
+  // ── 1. Compañías según scope ─────────────────────────────────────────────
+  let compQuery = supabase
     .from('companias')
-    .select('id, nombre, codigo, activa')
+    .select('id, nombre, codigo')
     .eq('activa', true)
     .order('nombre')
     .limit(500);
 
+  if (scope.type === 'companias' && scope.companias.length > 0) {
+    compQuery = compQuery.in('id', scope.companias);
+  }
+
+  const { data: companias, error: compErr } = await compQuery;
   if (compErr) return c.json(err('DB_ERROR', compErr.message), 500);
   if (!companias || companias.length === 0) return c.json({ data: [], error: null });
 
-  // 2. Queries paralelas para todos los KPIs del mes
+  const allCompaniaIds = (companias as any[]).map((c: any) => c.id);
+
+  // ── 2. Para tramitador: descubrir sus compañías a partir de sus expedientes ─
+  // (solo muestra las compañías donde tiene expedientes, no todas)
+  let visibleCompaniaIds = allCompaniaIds;
+
+  if (scope.type === 'tramitador') {
+    if (!scope.tramitador_id) {
+      // Sin registro → sin datos
+      return c.json({ data: [], error: null });
+    }
+    const { data: tramExp } = await supabase
+      .from('expedientes')
+      .select('compania_id')
+      .eq('tramitador_id', scope.tramitador_id)
+      .limit(10000);
+
+    const tramCompSet = new Set<string>(
+      (tramExp ?? []).map((e: any) => e.compania_id).filter(Boolean),
+    );
+    visibleCompaniaIds = allCompaniaIds.filter((id: string) => tramCompSet.has(id));
+
+    if (visibleCompaniaIds.length === 0) return c.json({ data: [], error: null });
+  }
+
+  // ── 3. Expedientes creados en el periodo (base para nuevos, facturado, coste) ─
+  let expNuevosQ = supabase
+    .from('expedientes')
+    .select('id, compania_id, tramitador_id')
+    .gte('created_at', periodoDesde)
+    .lte('created_at', periodoHasta)
+    .in('compania_id', visibleCompaniaIds)
+    .limit(10000);
+
+  if (scope.type === 'tramitador' && scope.tramitador_id) {
+    expNuevosQ = expNuevosQ.eq('tramitador_id', scope.tramitador_id);
+  }
+
+  // ── 4. Expedientes cerrados en el periodo ────────────────────────────────
+  let expCerradosQ = supabase
+    .from('expedientes')
+    .select('compania_id')
+    .eq('estado', 'CERRADO')
+    .gte('updated_at', periodoDesde)
+    .lte('updated_at', periodoHasta)
+    .in('compania_id', visibleCompaniaIds)
+    .limit(10000);
+
+  if (scope.type === 'tramitador' && scope.tramitador_id) {
+    expCerradosQ = expCerradosQ.eq('tramitador_id', scope.tramitador_id);
+  }
+
+  // ── 5. Expedientes activos en este momento (sin filtro de fecha) ──────────
+  const ESTADOS_ACTIVOS = ['NUEVO', 'NO_ASIGNADO', 'EN_PLANIFICACION', 'EN_CURSO', 'PENDIENTE', 'PENDIENTE_MATERIAL', 'PENDIENTE_PERITO', 'PENDIENTE_CLIENTE', 'FINALIZADO'];
+
+  let expActivosQ = supabase
+    .from('expedientes')
+    .select('compania_id')
+    .in('estado', ESTADOS_ACTIVOS)
+    .in('compania_id', visibleCompaniaIds)
+    .limit(10000);
+
+  if (scope.type === 'tramitador' && scope.tramitador_id) {
+    expActivosQ = expActivosQ.eq('tramitador_id', scope.tramitador_id);
+  }
+
+  // ── 6. Ejecutar en paralelo ───────────────────────────────────────────────
   const [
     { data: nuevosRows },
     { data: cerradosRows },
-    { data: enCursoRows },
-    { data: facturaRows },
-  ] = await Promise.all([
-    supabase
-      .from('expedientes')
-      .select('id, compania_id')
-      .gte('created_at', mesInicioTs)
-      .lte('created_at', mesFinTs)
-      .limit(10000),
-    supabase
-      .from('expedientes')
-      .select('compania_id')
-      .eq('estado', 'CERRADO')
-      .gte('updated_at', mesInicioTs)
-      .lte('updated_at', mesFinTs)
-      .limit(10000),
-    supabase
-      .from('expedientes')
-      .select('compania_id')
-      .in('estado', ['NUEVO', 'NO_ASIGNADO', 'EN_PLANIFICACION', 'EN_CURSO', 'PENDIENTE', 'PENDIENTE_MATERIAL', 'PENDIENTE_PERITO', 'PENDIENTE_CLIENTE', 'FINALIZADO'])
-      .limit(10000),
-    supabase
-      .from('facturas')
-      .select('compania_id, base_imponible')
-      .gte('fecha_emision', mesInicio)
-      .lte('fecha_emision', mesFin)
-      .neq('estado', 'anulada')
-      .limit(10000),
-  ]);
+    { data: activosRows },
+  ] = await Promise.all([expNuevosQ, expCerradosQ, expActivosQ]);
 
-  // 3. Coste operario: presupuestos de expedientes creados este mes
+  // ── 7. Facturas de los expedientes creados en el periodo ──────────────────
+  // Misma lógica que /kpis → totales deben coincidir
   const expNuevosIds = (nuevosRows ?? []).map((e: any) => e.id);
   const expIdToComp  = new Map<string, string>(
     (nuevosRows ?? []).map((e: any) => [e.id as string, e.compania_id as string]),
   );
 
-  let costeRows: any[] = [];
+  let facturaByComp = new Map<string, number>();
+  let costeByComp   = new Map<string, number>();
+
   if (expNuevosIds.length > 0) {
-    const { data } = await supabase
-      .from('presupuestos')
-      .select('expediente_id, coste_estimado')
-      .in('expediente_id', expNuevosIds)
-      .limit(10000);
-    costeRows = data ?? [];
+    const [{ data: facturas }, { data: presupuestos }] = await Promise.all([
+      supabase
+        .from('facturas')
+        .select('expediente_id, total')
+        .in('expediente_id', expNuevosIds)
+        .neq('estado', 'anulada')
+        .limit(10000),
+      supabase
+        .from('presupuestos')
+        .select('expediente_id, coste_estimado')
+        .in('expediente_id', expNuevosIds)
+        .limit(10000),
+    ]);
+
+    for (const f of (facturas ?? []) as any[]) {
+      const cid = expIdToComp.get(f.expediente_id);
+      if (cid) facturaByComp.set(cid, (facturaByComp.get(cid) ?? 0) + (f.total ?? 0));
+    }
+    for (const p of (presupuestos ?? []) as any[]) {
+      const cid = expIdToComp.get(p.expediente_id);
+      if (cid) costeByComp.set(cid, (costeByComp.get(cid) ?? 0) + (p.coste_estimado ?? 0));
+    }
   }
 
-  // 4. Agregar por compañía
-  const nuevosByComp    = ckpiGroupCount(nuevosRows  ?? [], 'compania_id');
-  const cerradosByComp  = ckpiGroupCount(cerradosRows ?? [], 'compania_id');
-  const enCursoByComp   = ckpiGroupCount(enCursoRows  ?? [], 'compania_id');
-  const facturadoByComp = ckpiGroupSum(facturaRows    ?? [], 'compania_id', 'base_imponible');
+  // ── 8. Agregar por compañía ───────────────────────────────────────────────
+  const nuevosByComp   = ckpiGroupCount(nuevosRows   ?? [], 'compania_id');
+  const cerradosByComp = ckpiGroupCount(cerradosRows ?? [], 'compania_id');
+  const activosByComp  = ckpiGroupCount(activosRows  ?? [], 'compania_id');
 
-  const costeByComp = new Map<string, number>();
-  for (const p of costeRows) {
-    const cid = expIdToComp.get(p.expediente_id);
-    if (cid) costeByComp.set(cid, (costeByComp.get(cid) ?? 0) + (p.coste_estimado ?? 0));
-  }
-
-  const data = (companias as any[]).map((comp) => ({
-    compania_id:       comp.id,
-    compania_nombre:   comp.nombre,
-    prefijo:           comp.codigo ?? '',
-    nuevos_mes:        nuevosByComp.get(comp.id)    ?? 0,
-    cerrados_mes:      cerradosByComp.get(comp.id)  ?? 0,
-    en_curso:          enCursoByComp.get(comp.id)   ?? 0,
-    facturado_mes:     r2(facturadoByComp.get(comp.id) ?? 0),
-    coste_operario_mes: r2(costeByComp.get(comp.id)   ?? 0),
-  }));
+  const data = (companias as any[])
+    .filter((comp: any) => visibleCompaniaIds.includes(comp.id))
+    .map((comp: any) => ({
+      compania_id:        comp.id,
+      compania_nombre:    comp.nombre,
+      prefijo:            comp.codigo ?? '',
+      nuevos_mes:         nuevosByComp.get(comp.id)    ?? 0,
+      cerrados_mes:       cerradosByComp.get(comp.id)  ?? 0,
+      en_curso:           activosByComp.get(comp.id)   ?? 0,
+      facturado_mes:      r2(facturaByComp.get(comp.id)  ?? 0),
+      coste_operario_mes: r2(costeByComp.get(comp.id)    ?? 0),
+    }));
 
   return c.json({ data, error: null });
 });

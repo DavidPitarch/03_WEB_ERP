@@ -199,7 +199,7 @@ protectRouteGroup('/tareas', requireRoles(OFFICE_ROLES));
 protectRouteGroup('/alertas', requireRoles(OFFICE_ROLES));
 protectRouteGroup('/baremos', requireRoles(OFFICE_ROLES));
 protectRouteGroup('/presupuestos', requireRoles(OFFICE_ROLES));
-protectRouteGroup('/dashboard', requireRoles(['admin', 'supervisor', 'financiero']));
+protectRouteGroup('/dashboard', requireRoles(['admin', 'supervisor', 'financiero', 'tramitador']));
 protectRouteGroup('/autofacturas', requireRoles(['admin', 'financiero']));
 protectRouteGroup('/pedidos', requireRoles(['admin', 'supervisor', 'tramitador', 'financiero']));
 protectRouteGroup('/proveedores', requireRoles(['admin', 'supervisor', 'tramitador', 'financiero']));

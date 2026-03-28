@@ -265,7 +265,7 @@ export function DashboardPage() {
   const kpis:     any = kpiData     && 'data' in kpiData     ? kpiData.data     : null;
   const prevKpis: any = prevKpiData && 'data' in prevKpiData ? prevKpiData.data : null;
 
-  const { data: compData, isLoading: compLoading } = useCompaniasKpisMes();
+  const { data: compData, isLoading: compLoading } = useCompaniasKpisMes(currentFilters);
   const companias: CompaniaRow[] = compData && 'data' in compData ? (compData.data as CompaniaRow[]) ?? [] : [];
 
   const fmt = (v: any) => Number(v ?? 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
@@ -366,7 +366,9 @@ export function DashboardPage() {
       <div className="dashboard-section">
         <div className="section-header">
           <h3>Actividad por compañía</h3>
-          <span className="section-meta">{mesLabel} · {companias.length} compañías activas</span>
+          <span className="section-meta">
+            {period ? PERIOD_LABELS[period] : mesLabel} · {companias.length} compañías activas
+          </span>
         </div>
         <CompaniasKpiTable rows={companias} isLoading={compLoading} />
       </div>

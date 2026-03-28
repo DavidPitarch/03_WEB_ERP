@@ -11,6 +11,10 @@ import {
   useAddCompaniaEspecialidad,
   useUpdateCompaniaEspecialidad,
   useRemoveCompaniaEspecialidad,
+  useCompaniaTiposSiniestro,
+  useAddCompaniaTipoSiniestro,
+  useRemoveCompaniaTipoSiniestro,
+  useTiposSiniestro,
 } from '@/hooks/useMasters';
 import { useBaremos } from '@/hooks/useBaremos';
 import { useEspecialidades } from '@/hooks/useEspecialidades';
@@ -45,7 +49,7 @@ const SISTEMAS: { value: CompaniaSistema; label: string }[] = [
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Section = 'especialidades' | 'baremos' | 'tramitadores' | 'plantillas';
+type Section = 'especialidades' | 'baremos' | 'tramitadores' | 'tipos-siniestro' | 'plantillas';
 type ExpandedRow = { companiaId: string; section: Section };
 
 interface CompaniaConfig {
@@ -392,6 +396,100 @@ function TramitadoresPanel({ companiaId }: { companiaId: string }) {
   );
 }
 
+// ─── TiposSiniestroPanel ──────────────────────────────────────────────────────
+
+function TiposSiniestroPanel({ companiaId }: { companiaId: string }) {
+  const { data: asignadosRes, isLoading } = useCompaniaTiposSiniestro(companiaId);
+  const { data: todosRes }                = useTiposSiniestro();
+  const addMut    = useAddCompaniaTipoSiniestro();
+  const removeMut = useRemoveCompaniaTipoSiniestro();
+  const [selectedId, setSelectedId] = useState('');
+
+  const asignados: any[] = (asignadosRes as any)?.data ?? [];
+  const todos: any[]     = (todosRes as any)?.data ?? [];
+  const asignadosIds     = new Set(asignados.map((r: any) => r.tipo_siniestro_id));
+  const disponibles      = todos.filter((t: any) => !asignadosIds.has(t.id));
+
+  const handleAdd = () => {
+    if (!selectedId) return;
+    addMut.mutate(
+      { companiaId, tipoSiniestroId: selectedId },
+      { onSuccess: () => setSelectedId('') },
+    );
+  };
+
+  if (isLoading) return <div className="cpanel__loading">Cargando tipos…</div>;
+
+  return (
+    <div>
+      <div className="cpanel__add-row">
+        <select
+          className="form-control cpanel__select"
+          value={selectedId}
+          onChange={e => setSelectedId(e.target.value)}
+        >
+          <option value="">Seleccione tipo de siniestro…</option>
+          {disponibles.map((t: any) => (
+            <option key={t.id} value={t.id}>{t.nombre}</option>
+          ))}
+        </select>
+        <button
+          className="btn-primary btn--sm"
+          onClick={handleAdd}
+          disabled={!selectedId || addMut.isPending}
+        >
+          Añadir tipo
+        </button>
+      </div>
+
+      {asignados.length === 0 ? (
+        <div className="cpanel__empty">No hay tipos de siniestro configurados para esta compañía.</div>
+      ) : (
+        <table className="data-table cpanel__table">
+          <thead>
+            <tr>
+              <th>Tipo de siniestro</th>
+              <th style={{ width: 60 }}>Color</th>
+              <th style={{ width: 80 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {asignados.map((row: any) => {
+              const tipo = row.tipos_siniestro ?? {};
+              return (
+                <tr key={row.id}>
+                  <td><strong>{tipo.nombre}</strong></td>
+                  <td>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: 20,
+                        height: 20,
+                        borderRadius: 4,
+                        background: tipo.color ?? '#6b7280',
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <button
+                      className="btn-link"
+                      style={{ color: 'var(--red-600)', fontSize: 'var(--text-sm)' }}
+                      onClick={() => removeMut.mutate({ companiaId, tipoId: row.id })}
+                      disabled={removeMut.isPending}
+                    >
+                      Quitar
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 // ─── EditModal ────────────────────────────────────────────────────────────────
 
 interface EditModalProps {
@@ -646,10 +744,11 @@ function EditModal({ compania, onClose, onSave, isPending, error }: EditModalPro
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 const SECTIONS: { key: Section; label: string }[] = [
-  { key: 'especialidades', label: 'Especialidades' },
-  { key: 'baremos',        label: 'Baremos'        },
-  { key: 'tramitadores',   label: 'Tramitadores'   },
-  { key: 'plantillas',     label: 'Plantillas'     },
+  { key: 'especialidades',  label: 'Especialidades'   },
+  { key: 'baremos',         label: 'Baremos'          },
+  { key: 'tramitadores',    label: 'Tramitadores'     },
+  { key: 'tipos-siniestro', label: 'Tipos siniestro'  },
+  { key: 'plantillas',      label: 'Plantillas'       },
 ];
 
 export function CompaniasPage() {
@@ -846,6 +945,9 @@ export function CompaniasPage() {
                     )}
                     {expanded.section === 'tramitadores' && (
                       <TramitadoresPanel companiaId={c.id} />
+                    )}
+                    {expanded.section === 'tipos-siniestro' && (
+                      <TiposSiniestroPanel companiaId={c.id} />
                     )}
                     {expanded.section === 'plantillas' && (
                       <div className="cpanel__placeholder">

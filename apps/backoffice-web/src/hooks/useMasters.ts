@@ -213,3 +213,54 @@ export function useCatalogos(tipo?: string) {
     queryFn: () => api.get<{ id: string; tipo: string; codigo: string; valor: string }[]>(`/masters/catalogos${tipo ? `?tipo=${tipo}` : ''}`),
   });
 }
+
+// ─── Tipos de siniestro por compañía ──────────────────────────────────────────
+
+export function useCompaniaTiposSiniestro(companiaId: string | null) {
+  return useQuery({
+    queryKey: ['compania-tipos-siniestro', companiaId],
+    queryFn: () => api.get<any[]>(`/masters/companias/${companiaId}/tipos-siniestro`),
+    enabled: !!companiaId,
+  });
+}
+
+export function useTiposSiniestroForCompania(companiaId: string | null) {
+  return useQuery({
+    queryKey: ['tipos-siniestro-compania', companiaId],
+    queryFn: () => api.get<{ id: string; nombre: string; color: string; orden: number }[]>(
+      `/tipos-siniestro?compania_id=${companiaId}`
+    ),
+    enabled: !!companiaId,
+  });
+}
+
+export function useTiposSiniestro() {
+  return useQuery({
+    queryKey: ['tipos-siniestro'],
+    queryFn: () => api.get<{ id: string; nombre: string; color: string; orden: number }[]>('/tipos-siniestro?activo=true'),
+  });
+}
+
+export function useAddCompaniaTipoSiniestro() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ companiaId, tipoSiniestroId }: { companiaId: string; tipoSiniestroId: string }) =>
+      api.post(`/masters/companias/${companiaId}/tipos-siniestro`, { tipo_siniestro_id: tipoSiniestroId }),
+    onSuccess: (_, { companiaId }) => {
+      qc.invalidateQueries({ queryKey: ['compania-tipos-siniestro', companiaId] });
+      qc.invalidateQueries({ queryKey: ['tipos-siniestro-compania', companiaId] });
+    },
+  });
+}
+
+export function useRemoveCompaniaTipoSiniestro() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ companiaId, tipoId }: { companiaId: string; tipoId: string }) =>
+      api.del(`/masters/companias/${companiaId}/tipos-siniestro/${tipoId}`),
+    onSuccess: (_, { companiaId }) => {
+      qc.invalidateQueries({ queryKey: ['compania-tipos-siniestro', companiaId] });
+      qc.invalidateQueries({ queryKey: ['tipos-siniestro-compania', companiaId] });
+    },
+  });
+}

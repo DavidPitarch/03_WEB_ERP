@@ -5,9 +5,25 @@ import type { Env } from '../types';
 export const tiposSiniestroRoutes = new Hono<{ Bindings: Env }>();
 
 // GET /tipos-siniestro
+// ?compania_id=uuid  → devuelve los tipos configurados para esa compañía
+// ?activo=true|false → filtro opcional (solo aplica sin compania_id)
 tiposSiniestroRoutes.get('/', async (c) => {
-  const supabase = c.get('supabase');
-  const activo = c.req.query('activo');
+  const supabase    = c.get('supabase');
+  const companiaId  = c.req.query('compania_id');
+  const activo      = c.req.query('activo');
+
+  if (companiaId) {
+    const { data, error } = await supabase
+      .from('compania_tipos_siniestro')
+      .select('tipos_siniestro ( id, nombre, color, orden )')
+      .eq('compania_id', companiaId)
+      .eq('activo', true)
+      .order('orden');
+
+    if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+    const tipos = (data ?? []).map((row: any) => row.tipos_siniestro).filter(Boolean);
+    return c.json({ data: tipos, error: null });
+  }
 
   let query = supabase.from('tipos_siniestro').select('*');
   if (activo !== undefined && activo !== '') query = query.eq('activo', activo === 'true');

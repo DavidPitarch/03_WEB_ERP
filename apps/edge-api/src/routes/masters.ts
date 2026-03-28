@@ -258,6 +258,68 @@ mastersRoutes.delete('/companias/:id/especialidades/:espId', async (c) => {
   return c.json({ data: { deleted: true }, error: null });
 });
 
+// ── Tipos de siniestro de una compañía ─────────────────────────────────────
+
+mastersRoutes.get('/companias/:id/tipos-siniestro', async (c) => {
+  const supabase = c.get('supabase');
+  const id = c.req.param('id');
+
+  const { data, error } = await supabase
+    .from('compania_tipos_siniestro')
+    .select(`
+      id,
+      compania_id,
+      tipo_siniestro_id,
+      activo,
+      orden,
+      tipos_siniestro ( id, nombre, color, orden )
+    `)
+    .eq('compania_id', id)
+    .eq('activo', true)
+    .order('orden');
+
+  if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+  return c.json({ data: data ?? [], error: null });
+});
+
+mastersRoutes.post('/companias/:id/tipos-siniestro', async (c) => {
+  const supabase = c.get('supabase');
+  const user = c.get('user');
+  const companiaId = c.req.param('id');
+  const body = await c.req.json<{ tipo_siniestro_id: string; orden?: number }>();
+
+  if (!body.tipo_siniestro_id) {
+    return c.json({ data: null, error: { code: 'VALIDATION', message: 'tipo_siniestro_id es obligatorio' } }, 422);
+  }
+
+  const { data, error } = await supabase
+    .from('compania_tipos_siniestro')
+    .upsert({ compania_id: companiaId, tipo_siniestro_id: body.tipo_siniestro_id, orden: body.orden ?? 0, activo: true }, { onConflict: 'compania_id,tipo_siniestro_id' })
+    .select('*')
+    .single();
+
+  if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+  await insertAudit(supabase, { tabla: 'compania_tipos_siniestro', registro_id: data.id, accion: 'INSERT', actor_id: user.id, cambios: body });
+  return c.json({ data, error: null }, 201);
+});
+
+mastersRoutes.delete('/companias/:id/tipos-siniestro/:tipoId', async (c) => {
+  const supabase = c.get('supabase');
+  const user = c.get('user');
+  const companiaId = c.req.param('id');
+  const tipoId     = c.req.param('tipoId');
+
+  const { error } = await supabase
+    .from('compania_tipos_siniestro')
+    .delete()
+    .eq('id', tipoId)
+    .eq('compania_id', companiaId);
+
+  if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+  await insertAudit(supabase, { tabla: 'compania_tipos_siniestro', registro_id: tipoId, accion: 'DELETE', actor_id: user.id, cambios: {} });
+  return c.json({ data: { deleted: true }, error: null });
+});
+
 // ═══════════════════════════════════════
 // OPERARIOS
 // ═══════════════════════════════════════

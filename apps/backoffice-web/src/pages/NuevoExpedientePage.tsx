@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { useCompanias, useEmpresasFacturadoras, useAsegurados, useCatalogos } from '@/hooks/useMasters';
+import { useCompanias, useEmpresasFacturadoras, useAsegurados, useTiposSiniestroForCompania } from '@/hooks/useMasters';
 import type { CreateExpedienteRequest } from '@erp/types';
 
 export function NuevoExpedientePage() {
@@ -12,11 +12,13 @@ export function NuevoExpedientePage() {
   // Lookups
   const { data: companiasRes } = useCompanias();
   const { data: empresasRes } = useEmpresasFacturadoras();
-  const { data: tiposRes } = useCatalogos('tipo_siniestro');
 
   const companias = companiasRes && 'data' in companiasRes ? companiasRes.data ?? [] : [];
   const empresas = empresasRes && 'data' in empresasRes ? empresasRes.data ?? [] : [];
-  const tipos = tiposRes && 'data' in tiposRes ? tiposRes.data ?? [] : [];
+
+  // Tipos de siniestro filtrados por compañía seleccionada
+  const { data: tiposRes } = useTiposSiniestroForCompania(form.compania_id || null);
+  const tipos = tiposRes && 'data' in tiposRes ? (tiposRes.data ?? []) : [];
 
   // Asegurado search
   const [aseguradoSearch, setAseguradoSearch] = useState('');
@@ -31,6 +33,7 @@ export function NuevoExpedientePage() {
     empresa_facturadora_id: '',
     tipo_siniestro: '',
     descripcion: '',
+    declaracion_siniestro: '',
     direccion_siniestro: '',
     codigo_postal: '',
     localidad: '',
@@ -66,7 +69,12 @@ export function NuevoExpedientePage() {
     },
   });
 
-  const set = (field: string, value: string) => setForm((f) => ({ ...f, [field]: value }));
+  const set = (field: string, value: string) => setForm((f) => ({
+    ...f,
+    [field]: value,
+    // Al cambiar compañía, resetear tipo_siniestro para evitar valores inválidos
+    ...(field === 'compania_id' ? { tipo_siniestro: '' } : {}),
+  }));
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -77,6 +85,7 @@ export function NuevoExpedientePage() {
       empresa_facturadora_id: form.empresa_facturadora_id,
       tipo_siniestro: form.tipo_siniestro,
       descripcion: form.descripcion,
+      declaracion_siniestro: form.declaracion_siniestro || undefined,
       direccion_siniestro: form.direccion_siniestro,
       codigo_postal: form.codigo_postal,
       localidad: form.localidad,
@@ -142,9 +151,18 @@ export function NuevoExpedientePage() {
             </div>
             <div className="form-group">
               <label>Tipo de siniestro *</label>
-              <select value={form.tipo_siniestro} onChange={(e) => set('tipo_siniestro', e.target.value)} required>
-                <option value="">Seleccionar...</option>
-                {tipos.map((t: any) => <option key={t.codigo} value={t.codigo}>{t.valor}</option>)}
+              <select
+                value={form.tipo_siniestro}
+                onChange={(e) => set('tipo_siniestro', e.target.value)}
+                required
+                disabled={!form.compania_id}
+              >
+                <option value="">
+                  {form.compania_id ? 'Seleccionar...' : 'Seleccione compañía primero'}
+                </option>
+                {tipos.map((t: any) => (
+                  <option key={t.id} value={t.nombre}>{t.nombre}</option>
+                ))}
               </select>
             </div>
             <div className="form-group">
@@ -168,6 +186,15 @@ export function NuevoExpedientePage() {
           <div className="form-group">
             <label>Descripción *</label>
             <textarea value={form.descripcion} onChange={(e) => set('descripcion', e.target.value)} required rows={3} />
+          </div>
+          <div className="form-group">
+            <label>Declaración de siniestro</label>
+            <textarea
+              value={form.declaracion_siniestro}
+              onChange={(e) => set('declaracion_siniestro', e.target.value)}
+              rows={4}
+              placeholder="Relato del siniestro según el asegurado o la compañía..."
+            />
           </div>
         </section>
 

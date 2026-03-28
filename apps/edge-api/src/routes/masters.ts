@@ -34,6 +34,42 @@ mastersRoutes.get('/companias/:id', async (c) => {
   return c.json({ data, error: null });
 });
 
+// GET /companias/:id/sugerir-numero-expediente?provincia=Barcelona
+// Devuelve el siguiente número sugerido sin incrementar el contador.
+mastersRoutes.get('/companias/:id/sugerir-numero-expediente', async (c) => {
+  const supabase = c.get('supabase');
+  const id = c.req.param('id');
+  const provincia = c.req.query('provincia') ?? '';
+
+  const { data: compania, error: compError } = await supabase
+    .from('companias')
+    .select('id, config')
+    .eq('id', id)
+    .single();
+
+  if (compError || !compania) {
+    return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Compañía no encontrada' } }, 404);
+  }
+
+  const cfg = (compania.config ?? {}) as Record<string, unknown>;
+  const autonumeroActivo = cfg.autonumero_expediente === true;
+
+  if (!autonumeroActivo) {
+    return c.json({ data: { autonumero_activo: false, sugerido: null }, error: null });
+  }
+
+  const { data: sugerido, error: rpcError } = await supabase.rpc(
+    'erp_preview_expediente_numero_compania',
+    { p_compania_id: id, p_provincia: provincia },
+  );
+
+  if (rpcError) {
+    return c.json({ data: null, error: { code: 'DB_ERROR', message: rpcError.message } }, 500);
+  }
+
+  return c.json({ data: { autonumero_activo: true, sugerido: sugerido as string }, error: null });
+});
+
 // ── Tramitadores vinculados a una compañía ──────────────────────────────────
 
 mastersRoutes.get('/companias/:id/tramitadores', async (c) => {

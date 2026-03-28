@@ -67,6 +67,8 @@ interface CompaniaConfig {
   notificar_sms: boolean;
   auto_numerico: boolean;
   asignar_corredor: boolean;
+  autonumero_expediente: boolean;
+  autonumero_expediente_prefijo: string;
 }
 
 interface CompaniaForm {
@@ -84,6 +86,7 @@ const CONFIG_DEFAULT: CompaniaConfig = {
   telefono: '', fax: '', email: '', prefijo: '',
   fact_por_partidas: false, albaranes: false, notificar_sms: false,
   auto_numerico: false, asignar_corredor: false,
+  autonumero_expediente: false, autonumero_expediente_prefijo: '',
 };
 
 const FORM_DEFAULT: CompaniaForm = {
@@ -115,6 +118,8 @@ function companiaToForm(c: Compania): CompaniaForm {
       notificar_sms:     Boolean(cfg.notificar_sms),
       auto_numerico:     Boolean(cfg.auto_numerico),
       asignar_corredor:  Boolean(cfg.asignar_corredor),
+      autonumero_expediente:         Boolean(cfg.autonumero_expediente),
+      autonumero_expediente_prefijo: String(cfg.autonumero_expediente_prefijo ?? ''),
     },
   };
 }
@@ -711,6 +716,38 @@ function EditModal({ compania, onClose, onSave, isPending, error }: EditModalPro
                   </label>
                 ))}
               </div>
+
+              <p className="compania-section-title" style={{ marginTop: 'var(--space-5)' }}>
+                Auto-numeración de expedientes
+              </p>
+              <label className="compania-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={form.config.autonumero_expediente}
+                  onChange={e => setConfig('autonumero_expediente', e.target.checked)}
+                />
+                Activar auto-numeración (formato: PREFIJO_NNN_PROV)
+              </label>
+              {form.config.autonumero_expediente && (
+                <div className="form-group-v2" style={{ marginTop: 'var(--space-3)', maxWidth: 240 }}>
+                  <label className="form-label">
+                    Prefijo compañía
+                    <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted, #6b7280)', marginLeft: 6 }}>
+                      (2-5 letras, ej: ALL, MAP, GEN)
+                    </span>
+                  </label>
+                  <input
+                    className="form-control"
+                    value={form.config.autonumero_expediente_prefijo}
+                    onChange={e => setConfig('autonumero_expediente_prefijo', e.target.value.toUpperCase())}
+                    placeholder="Ej: ALL"
+                    maxLength={5}
+                  />
+                  <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted, #6b7280)', marginTop: 4 }}>
+                    Ejemplo de número generado: <strong>{form.config.autonumero_expediente_prefijo || 'EXP'}_001_BAR</strong>
+                  </p>
+                </div>
+              )}
             </>
           )}
 

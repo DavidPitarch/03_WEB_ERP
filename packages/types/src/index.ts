@@ -619,6 +619,8 @@ export interface SearchResult {
 
 // ─── Crear expediente ───
 export interface CreateExpedienteRequest {
+  /** Número de expediente manual. Si se omite, el backend genera uno automáticamente. */
+  numero_expediente?: string;
   compania_id: string;
   empresa_facturadora_id: string;
   tipo_siniestro: string;

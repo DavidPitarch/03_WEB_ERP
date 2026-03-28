@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useCompanias, useEmpresasFacturadoras, useAsegurados, useTiposSiniestroForCompania } from '@/hooks/useMasters';
 import type { CreateExpedienteRequest } from '@erp/types';
@@ -30,6 +30,7 @@ export function NuevoExpedientePage() {
     tipo_siniestro: '',
     descripcion: '',
     declaracion_siniestro: '',
+    numero_expediente: '',
     direccion_siniestro: '',
     codigo_postal: '',
     localidad: '',
@@ -50,11 +51,37 @@ export function NuevoExpedientePage() {
     aseg_provincia: '',
   });
 
+  // Controla si el nº expediente fue auto-sugerido (se puede sobreescribir con sugerencia nueva)
+  // o fue editado manualmente (no sobreescribir)
+  const numeroModoRef = useRef<'none' | 'auto' | 'manual'>('none');
+
   const [error, setError] = useState('');
 
   // Tipos de siniestro filtrados por compañía seleccionada (necesita form.compania_id)
   const { data: tiposRes } = useTiposSiniestroForCompania(form.compania_id || null);
   const tipos = tiposRes && 'data' in tiposRes ? (tiposRes.data ?? []) : [];
+
+  // Sugerencia de número de expediente (preview sin incrementar contador)
+  const { data: sugerenciaRes } = useQuery({
+    queryKey: ['sugerir-num-exp', form.compania_id, form.provincia],
+    queryFn: () =>
+      api.get(`/masters/companias/${form.compania_id}/sugerir-numero-expediente?provincia=${encodeURIComponent(form.provincia)}`),
+    enabled: !!form.compania_id,
+    staleTime: 15_000,
+  });
+  const sugerencia = (sugerenciaRes as any)?.data as { autonumero_activo: boolean; sugerido: string | null } | undefined;
+
+  // Pre-rellenar el campo cuando llega una sugerencia (solo si no fue editado a mano)
+  useEffect(() => {
+    if (!sugerencia) return;
+    if (sugerencia.autonumero_activo && sugerencia.sugerido && numeroModoRef.current !== 'manual') {
+      setForm(f => ({ ...f, numero_expediente: sugerencia.sugerido! }));
+      numeroModoRef.current = 'auto';
+    } else if (!sugerencia.autonumero_activo && numeroModoRef.current === 'auto') {
+      setForm(f => ({ ...f, numero_expediente: '' }));
+      numeroModoRef.current = 'none';
+    }
+  }, [sugerencia]);
 
   const mutation = useMutation({
     mutationFn: (data: CreateExpedienteRequest) => api.post('/expedientes', data),
@@ -69,18 +96,22 @@ export function NuevoExpedientePage() {
     },
   });
 
-  const set = (field: string, value: string) => setForm((f) => ({
-    ...f,
-    [field]: value,
-    // Al cambiar compañía, resetear tipo_siniestro para evitar valores inválidos
-    ...(field === 'compania_id' ? { tipo_siniestro: '' } : {}),
-  }));
+  const set = (field: string, value: string) => {
+    if (field === 'compania_id') {
+      // Al cambiar compañía: resetear tipo, número y modo auto
+      numeroModoRef.current = 'none';
+      setForm(f => ({ ...f, compania_id: value, tipo_siniestro: '', numero_expediente: '' }));
+    } else {
+      setForm(f => ({ ...f, [field]: value }));
+    }
+  };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     setError('');
 
     const payload: CreateExpedienteRequest = {
+      numero_expediente: form.numero_expediente.trim() || undefined,
       compania_id: form.compania_id,
       empresa_facturadora_id: form.empresa_facturadora_id,
       tipo_siniestro: form.tipo_siniestro,
@@ -181,6 +212,31 @@ export function NuevoExpedientePage() {
             <div className="form-group">
               <label>Nº Siniestro Cía</label>
               <input value={form.numero_siniestro_cia} onChange={(e) => set('numero_siniestro_cia', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>
+                Nº Expediente
+                {sugerencia?.autonumero_activo && (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted, #6b7280)', marginLeft: 6 }}>
+                    (auto-sugerido)
+                  </span>
+                )}
+              </label>
+              <input
+                value={form.numero_expediente}
+                onChange={(e) => {
+                  numeroModoRef.current = 'manual';
+                  set('numero_expediente', e.target.value);
+                }}
+                placeholder={
+                  !form.compania_id
+                    ? 'Seleccione compañía primero'
+                    : sugerencia?.autonumero_activo
+                    ? sugerencia.sugerido ?? 'Cargando sugerencia...'
+                    : 'Introducir manualmente'
+                }
+                disabled={!form.compania_id}
+              />
             </div>
           </div>
           <div className="form-group">

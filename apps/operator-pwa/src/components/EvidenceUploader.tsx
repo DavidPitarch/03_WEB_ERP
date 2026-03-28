@@ -1,12 +1,15 @@
 import { useState, useRef } from 'react';
 import { api, uploadToSignedUrl } from '@/lib/api';
+import { storeBlob } from '@/lib/offline-blobs';
 import type { UploadInitResponse, EvidenciaClasificacion } from '@erp/types';
 
-interface UploadedEvidence {
+export interface UploadedEvidence {
   id: string;
   nombre: string;
   clasificacion: EvidenciaClasificacion;
   preview?: string;
+  /** Set when the file is stored in IndexedDB pending upload */
+  blobKey?: string;
 }
 
 interface FailedUpload {
@@ -55,8 +58,21 @@ export function EvidenceUploader({ expedienteId, citaId, onUploaded }: Props) {
         });
 
         if (!initRes || !('data' in initRes) || !initRes.data) {
-          const msg = initRes && 'error' in initRes && initRes.error ? initRes.error.message : 'Error al iniciar subida';
-          newFailures.push({ nombre: file.name, error: msg });
+          const errorCode = (initRes as any)?.error?.code;
+          if (errorCode === 'OFFLINE' || errorCode === 'NETWORK_ERROR') {
+            const blobKey = `evidence:${expedienteId}:${Date.now()}:${i}`;
+            await storeBlob(blobKey, file);
+            newEvidencias.push({
+              id: blobKey,
+              nombre: file.name,
+              clasificacion,
+              preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
+              blobKey,
+            });
+          } else {
+            const msg = initRes && 'error' in initRes && initRes.error ? initRes.error.message : 'Error al iniciar subida';
+            newFailures.push({ nombre: file.name, error: msg });
+          }
           continue;
         }
         const init = initRes.data as UploadInitResponse;
@@ -91,7 +107,20 @@ export function EvidenceUploader({ expedienteId, citaId, onUploaded }: Props) {
           newFailures.push({ nombre: file.name, error: 'Error al registrar evidencia' });
         }
       } catch {
-        newFailures.push({ nombre: file.name, error: 'Error de red' });
+        // Network down — store in IndexedDB for later upload
+        const blobKey = `evidence:${expedienteId}:${Date.now()}:${i}`;
+        try {
+          await storeBlob(blobKey, file);
+          newEvidencias.push({
+            id: blobKey,
+            nombre: file.name,
+            clasificacion,
+            preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
+            blobKey,
+          });
+        } catch {
+          newFailures.push({ nombre: file.name, error: 'Error de red' });
+        }
       }
     }
 
@@ -161,6 +190,7 @@ export function EvidenceUploader({ expedienteId, citaId, onUploaded }: Props) {
                 <div className="op-evidence-file">{ev.nombre}</div>
               )}
               <span className="op-evidence-label">{ev.clasificacion}</span>
+              {ev.blobKey && <span className="op-evidence-offline">Offline</span>}
               <button type="button" className="op-evidence-remove" onClick={() => remove(ev.id)}>&times;</button>
             </div>
           ))}

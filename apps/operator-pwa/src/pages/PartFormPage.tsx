@@ -3,7 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, uploadToSignedUrl, enqueueParte } from '@/lib/api';
 import { saveDraft, loadDraft, clearDraft } from '@/lib/offline-queue';
+import { storeBlob } from '@/lib/offline-blobs';
 import { EvidenceUploader } from '@/components/EvidenceUploader';
+import type { UploadedEvidence } from '@/components/EvidenceUploader';
 import { SignaturePad } from '@/components/SignaturePad';
 import type { ResultadoVisita, CreateParteRequest, UploadInitResponse } from '@erp/types';
 
@@ -34,7 +36,7 @@ export function PartFormPage() {
   const [resultado, setResultado] = useState<ResultadoVisita>('completada');
   const [motivoResultado, setMotivoResultado] = useState('');
   const [requiereNuevaVisita, setRequiereNuevaVisita] = useState(false);
-  const [evidenciaIds, setEvidenciaIds] = useState<string[]>([]);
+  const [uploadedEvidencias, setUploadedEvidencias] = useState<UploadedEvidence[]>([]);
   const [firmaPath, setFirmaPath] = useState<string | null>(null);
   const [firmaUploading, setFirmaUploading] = useState(false);
   const [firmaError, setFirmaError] = useState('');
@@ -92,7 +94,10 @@ export function PartFormPage() {
   });
 
   const handleOfflineSubmit = () => {
-    const payload: CreateParteRequest = {
+    const serverEvidenciaIds = uploadedEvidencias.filter((e) => !e.blobKey).map((e) => e.id);
+    const evidenceBlobKeys = uploadedEvidencias.filter((e) => !!e.blobKey).map((e) => e.blobKey!);
+
+    const payload = {
       expediente_id: expedienteId!,
       cita_id: citaId!,
       trabajos_realizados: trabajosRealizados,
@@ -103,7 +108,8 @@ export function PartFormPage() {
       motivo_resultado: motivoResultado || undefined,
       requiere_nueva_visita: requiereNuevaVisita,
       firma_storage_path: firmaPath ?? undefined,
-      evidencia_ids: evidenciaIds,
+      evidencia_ids: serverEvidenciaIds,
+      ...(evidenceBlobKeys.length > 0 ? { evidence_blob_keys: evidenceBlobKeys } : {}),
     };
     enqueueParte(expedienteId!, payload);
     clearDraft(expedienteId!, citaId!);
@@ -122,7 +128,14 @@ export function PartFormPage() {
       });
 
       if (!initRes || !('data' in initRes) || !initRes.data) {
-        setFirmaError('Error al iniciar subida de firma');
+        const errorCode = (initRes as any)?.error?.code;
+        if (errorCode === 'OFFLINE' || errorCode === 'NETWORK_ERROR') {
+          const blobKey = `firma:${expedienteId}:${citaId}:${Date.now()}`;
+          await storeBlob(blobKey, blob);
+          setFirmaPath(`offline:${blobKey}`);
+        } else {
+          setFirmaError('Error al iniciar subida de firma');
+        }
         setFirmaUploading(false);
         return;
       }
@@ -147,7 +160,14 @@ export function PartFormPage() {
       });
       setFirmaPath(init.storage_path);
     } catch {
-      setFirmaError('Error al guardar firma');
+      // Network down — store firma in IndexedDB
+      try {
+        const blobKey = `firma:${expedienteId}:${citaId}:${Date.now()}`;
+        await storeBlob(blobKey, blob);
+        setFirmaPath(`offline:${blobKey}`);
+      } catch {
+        setFirmaError('Error al guardar firma');
+      }
     }
     setFirmaUploading(false);
   };
@@ -165,6 +185,13 @@ export function PartFormPage() {
       return;
     }
 
+    // If any blobs are stored offline, always use the queue path
+    const hasOfflineBlobs = uploadedEvidencias.some((e) => e.blobKey) || firmaPath?.startsWith('offline:');
+    if (hasOfflineBlobs) {
+      handleOfflineSubmit();
+      return;
+    }
+
     mutation.mutate({
       expediente_id: expedienteId!,
       cita_id: citaId!,
@@ -176,7 +203,7 @@ export function PartFormPage() {
       motivo_resultado: motivoResultado || undefined,
       requiere_nueva_visita: requiereNuevaVisita,
       firma_storage_path: firmaPath ?? undefined,
-      evidencia_ids: evidenciaIds,
+      evidencia_ids: uploadedEvidencias.map((e) => e.id),
     });
   };
 
@@ -252,11 +279,11 @@ export function PartFormPage() {
         <EvidenceUploader
           expedienteId={expedienteId!}
           citaId={citaId!}
-          onUploaded={(evs) => setEvidenciaIds(evs.map((e) => e.id))}
+          onUploaded={(evs) => setUploadedEvidencias(evs)}
         />
 
         <SignaturePad onSave={handleFirmaSave} disabled={firmaUploading} />
-        {firmaPath && <div className="op-firma-ok">Firma guardada</div>}
+        {firmaPath && <div className="op-firma-ok">{firmaPath.startsWith('offline:') ? 'Firma guardada (offline)' : 'Firma guardada'}</div>}
         {firmaUploading && <div className="op-muted">Guardando firma...</div>}
         {firmaError && <div className="op-error">{firmaError}</div>}
 

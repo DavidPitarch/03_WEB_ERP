@@ -8,6 +8,7 @@ import {
 } from '../services/core-commands';
 import { validate, validationError } from '../validation/schema';
 import { suggestTramitador } from '../services/assignment-engine';
+import { requireRoles } from '../middleware/roles';
 import type { Env } from '../types';
 
 export const expedientesRoutes = new Hono<{ Bindings: Env }>();
@@ -63,7 +64,7 @@ expedientesRoutes.get('/:id', async (c) => {
 
   const { data, error } = await supabase
     .from('expedientes')
-    .select('*, companias(*), asegurados(*), operarios(*), peritos(*), empresas_facturadoras(*)')
+    .select('*, companias(*), asegurados(*), operarios(*), peritos(*), empresas_facturadoras(*), tramitadores(id, nombre, apellidos)')
     .eq('id', id)
     .single();
 
@@ -217,6 +218,48 @@ expedientesRoutes.post('/:id/transicion', async (c) => {
     }, commandError.status);
   }
 });
+
+// PATCH /expedientes/:id/tramitador - Asignar/reasignar tramitador
+expedientesRoutes.patch(
+  '/:id/tramitador',
+  requireRoles(['admin', 'supervisor', 'financiero', 'direccion']),
+  async (c) => {
+    const supabase = c.get('adminSupabase');
+    const user = c.get('user');
+    const id = c.req.param('id');
+    const { tramitador_id, motivo, force } = await c.req.json<{
+      tramitador_id: string;
+      motivo?: string;
+      force?: boolean;
+    }>();
+
+    if (!tramitador_id) {
+      return c.json({ data: null, error: { code: 'VALIDATION', message: 'tramitador_id requerido' } }, 422);
+    }
+
+    const { data, error } = await supabase.rpc('erp_asignar_tramitador', {
+      p_expediente_id: id,
+      p_tramitador_id: tramitador_id,
+      p_motivo:        motivo ?? 'Reasignación manual',
+      p_motivo_codigo: 'reasignacion_manual',
+      p_actor_id:      user.id,
+      p_force:         force ?? false,
+    });
+
+    if (error) {
+      const msg = error.message ?? '';
+      if (msg.includes('tramitador_at_capacity')) {
+        return c.json({ data: null, error: { code: 'TRAMITADOR_AT_CAPACITY', message: 'El tramitador ha alcanzado su capacidad máxima' } }, 409);
+      }
+      if (msg.includes('expediente_terminal_state')) {
+        return c.json({ data: null, error: { code: 'EXPEDIENTE_TERMINAL', message: 'El expediente está cerrado o cancelado' } }, 409);
+      }
+      return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+    }
+
+    return c.json({ data, error: null });
+  },
+);
 
 // GET /expedientes/:id/timeline - Timeline unificada
 expedientesRoutes.get('/:id/timeline', async (c) => {

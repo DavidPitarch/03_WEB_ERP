@@ -1,13 +1,12 @@
 name: Deploy edge-api
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
-    paths:
-      - 'apps/edge-api/**'
-      - 'packages/**'
 
-# Only one deploy at a time
+# Only one deploy at a time — never cancel a running deploy
 concurrency:
   group: deploy-api
   cancel-in-progress: false
@@ -16,12 +15,15 @@ jobs:
   deploy:
     name: Deploy to Cloudflare Workers (production)
     runs-on: ubuntu-latest
-    # Only deploy after CI passes on main
-    needs: []
-    if: github.ref == 'refs/heads/main'
+    # Only deploy when CI passed on main
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - uses: pnpm/action-setup@v4
         with:

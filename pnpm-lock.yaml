@@ -78,6 +78,9 @@ importers:
       '@erp/types':
         specifier: workspace:*
         version: link:../../packages/types
+      '@erp/validators':
+        specifier: workspace:*
+        version: link:../../packages/validators
       '@supabase/supabase-js':
         specifier: ^2.45.0
         version: 2.99.1
@@ -155,6 +158,8 @@ importers:
         version: 2.1.9(@types/node@25.5.0)(terser@5.46.1)
 
   packages/types: {}
+
+  packages/validators: {}
 
 packages:
 

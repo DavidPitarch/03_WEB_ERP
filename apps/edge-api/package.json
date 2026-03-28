@@ -14,7 +14,8 @@
     "hono": "^4.4.0",
     "@supabase/supabase-js": "^2.45.0",
     "@erp/domain": "workspace:*",
-    "@erp/types": "workspace:*"
+    "@erp/types": "workspace:*",
+    "@erp/validators": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240620.0",

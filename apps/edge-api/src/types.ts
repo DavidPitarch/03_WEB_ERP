@@ -7,6 +7,9 @@ export interface Env {
   CONFIRM_BASE_URL?: string;
   ALLOWED_ORIGINS?: string; // comma-separated origins for CORS
   VP_WEBHOOK_SECRET?: string;
+  CUSTOMER_PORTAL_URL?: string;
+  /** KV namespace para rate limiting distribuido. Opcional: sin binding usa fallback in-memory. */
+  RATE_LIMIT_KV?: KVNamespace;
   // DOMAIN_EVENTS_QUEUE: Queue; // descomentar al activar queues
 }
 

@@ -165,7 +165,7 @@ const EMPTY_LINEA: LineaPedido = { descripcion: '', cantidad: '1', unidad: '', r
 export function CreatePedidoModal({ expedienteId, onClose }: { expedienteId: string; onClose: () => void }) {
   const crear = useCrearPedido();
   const { data: provData } = useProveedores({ activo: true });
-  const proveedores: any[] = provData && 'data' in provData ? (provData.data as any[]) ?? [] : [];
+  const proveedores: any[] = provData && 'data' in provData ? ((provData.data as any)?.items ?? []) : [];
 
   const [proveedorId, setProveedorId] = useState('');
   const [fechaLimite, setFechaLimite] = useState('');

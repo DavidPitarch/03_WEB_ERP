@@ -2,6 +2,15 @@ name = "erp-siniestros-api"
 main = "src/index.ts"
 compatibility_date = "2024-06-01"
 
+# ─── KV Namespace: rate limiting distribuido ─────────────────────────────────
+# Crear con: wrangler kv:namespace create RATE_LIMIT_KV
+# Sustituir PLACEHOLDER con el ID devuelto por el comando anterior.
+# Sin este binding el Worker usa fallback in-memory (válido solo en dev).
+#
+# [[kv_namespaces]]
+# binding = "RATE_LIMIT_KV"
+# id = "PLACEHOLDER_KV_NAMESPACE_ID"
+
 # ─── Entorno de desarrollo (por defecto) ────────────────────────────────────
 [vars]
 ENVIRONMENT = "development"

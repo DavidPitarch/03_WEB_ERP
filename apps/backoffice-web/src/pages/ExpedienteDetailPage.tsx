@@ -115,6 +115,27 @@ export function ExpedienteDetailPage() {
           <h2>{e.numero_expediente}</h2>
           <span className="badge estado-badge">{ESTADO_LABELS[e.estado] ?? e.estado}</span>
           <span className={`badge prioridad-${e.prioridad}`}>{e.prioridad}</span>
+          {e.asegurados && (
+            <div className="detail-header-summary">
+              <span className="dhs-item dhs-name">{e.asegurados.nombre} {e.asegurados.apellidos}</span>
+              <span className="dhs-sep">|</span>
+              <span className="dhs-item">
+                {[e.asegurados.telefono, e.asegurados.telefono2, e.asegurados.telefono3]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+              <span className="dhs-sep">|</span>
+              <span className="dhs-item">{e.asegurados.direccion}</span>
+              <span className="dhs-sep">|</span>
+              <span className="dhs-item">CP: {e.asegurados.codigo_postal}</span>
+              <span className="dhs-sep">|</span>
+              <span className="dhs-item">{e.asegurados.localidad}</span>
+              <span className="dhs-sep">|</span>
+              <span className="dhs-item">{e.asegurados.provincia}</span>
+              <span className="dhs-sep">|</span>
+              <span className="dhs-item">NIF: {e.asegurados.nif ?? '—'}</span>
+            </div>
+          )}
         </div>
         <div className="detail-actions">
           {transicionesDisponibles.map((t) => (

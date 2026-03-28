@@ -624,6 +624,10 @@ a:hover { text-decoration: underline; }
 /* ─── DETAIL ─── */
 .detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-5); flex-wrap: wrap; gap: var(--space-4); }
 .detail-header h2 { font-size: var(--text-2xl); font-weight: var(--weight-semibold); color: var(--color-text-primary); }
+.detail-header-summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); margin-top: var(--space-2); font-size: var(--text-sm); color: var(--color-text-secondary); background: var(--color-bg-subtle, var(--color-bg-base)); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--color-border-default); }
+.detail-header-summary .dhs-name { font-weight: var(--weight-semibold); color: var(--color-text-primary); }
+.detail-header-summary .dhs-sep { color: var(--color-border-default); user-select: none; padding: 0 var(--space-1); }
+.detail-header-summary .dhs-item { white-space: nowrap; }
 .detail-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-5); }
 .detail-section { background: var(--color-surface); padding: var(--space-5); border-radius: var(--radius-lg); box-shadow: var(--shadow-xs); border: 1px solid var(--color-border-default); }

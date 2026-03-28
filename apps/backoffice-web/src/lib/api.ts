@@ -32,18 +32,23 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<ApiR
     } as ApiResult<T>;
   }
 
-  if (!res.ok && res.status >= 500) {
-    // Evitar parsear HTML que devuelve Cloudflare en errores de gateway
-    const contentType = res.headers.get('content-type') ?? '';
-    if (!contentType.includes('application/json')) {
-      return {
-        data: null,
-        error: { code: `HTTP_${res.status}`, message: `Error del servidor (${res.status}). Inténtalo de nuevo.` },
-      } as ApiResult<T>;
-    }
+  // Evitar parsear HTML que devuelve Cloudflare en errores de gateway (5xx y 4xx WAF)
+  const contentType = res.headers.get('content-type') ?? '';
+  if (!res.ok && !contentType.includes('application/json')) {
+    return {
+      data: null,
+      error: { code: `HTTP_${res.status}`, message: `Error del servidor (${res.status}). Inténtalo de nuevo.` },
+    } as ApiResult<T>;
   }
 
-  return res.json();
+  try {
+    return await res.json();
+  } catch {
+    return {
+      data: null,
+      error: { code: `HTTP_${res.status}`, message: `Respuesta no válida del servidor (${res.status}).` },
+    } as ApiResult<T>;
+  }
 }
 
 export const api = {

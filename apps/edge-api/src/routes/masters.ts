@@ -109,15 +109,21 @@ mastersRoutes.delete('/companias/:id/tramitadores/:tramitadorId', async (c) => {
 mastersRoutes.post('/companias', async (c) => {
   const supabase = c.get('supabase');
   const user = c.get('user');
-  const body = await c.req.json();
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ data: null, error: { code: 'BAD_REQUEST', message: 'El cuerpo de la petición no es JSON válido' } }, 400);
+  }
 
   if (!body.nombre || !body.codigo) {
     return c.json({ data: null, error: { code: 'VALIDATION', message: 'nombre y codigo requeridos' } }, 422);
   }
 
   const { data, error } = await supabase.from('companias').insert({
-    nombre: body.nombre,
-    codigo: body.codigo,
+    nombre:              body.nombre,
+    codigo:              body.codigo,
     cif:                 body.cif ?? null,
     activa:              body.activa ?? true,
     tipo:                body.tipo ?? 'compania',
@@ -126,6 +132,7 @@ mastersRoutes.post('/companias', async (c) => {
   }).select().single();
 
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+  if (!data) return c.json({ data: null, error: { code: 'DB_ERROR', message: 'La inserción no devolvió datos' } }, 500);
 
   await insertAudit(supabase, { tabla: 'companias', registro_id: data.id, accion: 'INSERT', actor_id: user.id, cambios: body });
   return c.json({ data, error: null }, 201);

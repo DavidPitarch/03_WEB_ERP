@@ -63,6 +63,25 @@ import type { Env } from './types';
 
 const app = new Hono<{ Bindings: Env }>();
 
+// ─── Global error handler ─────────────────────────────────────────────────────
+// Convierte cualquier excepción no capturada en JSON con formato ApiResult,
+// evitando que Hono devuelva text/plain y el frontend muestre el mensaje genérico.
+app.onError((err, c) => {
+  console.error(JSON.stringify({
+    level: 'error',
+    source: 'global_error_handler',
+    error: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : undefined,
+    method: c.req.method,
+    path: new URL(c.req.url).pathname,
+    ts: new Date().toISOString(),
+  }));
+  return c.json(
+    { data: null, error: { code: 'INTERNAL_ERROR', message: err instanceof Error ? err.message : 'Error interno del servidor' } },
+    500,
+  );
+});
+
 function getAllowedOrigins(envValue?: string): string[] {
   const defaults = ['http://localhost:5173', 'http://localhost:5174'];
   const extra = envValue?.split(',').map((origin) => origin.trim()).filter(Boolean) ?? [];

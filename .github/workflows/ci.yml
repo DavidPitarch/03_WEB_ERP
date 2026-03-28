@@ -95,6 +95,70 @@ jobs:
       - name: Build (typecheck + vite)
         run: pnpm build
 
+  # ── E2E tests (Playwright) ─────────────────────────────────────────────────
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    needs: [backoffice-web, operator-pwa]
+    defaults:
+      run:
+        working-directory: apps/e2e
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.5.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Install Playwright browsers
+        run: pnpm install-browsers
+
+      - name: Build backoffice-web for preview
+        run: pnpm build
+        working-directory: apps/backoffice-web
+        env:
+          VITE_API_URL: http://localhost:8787
+
+      - name: Build operator-pwa for preview
+        run: pnpm build
+        working-directory: apps/operator-pwa
+        env:
+          VITE_API_URL: http://localhost:8787
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Serve backoffice-web
+        run: npx --yes serve apps/backoffice-web/dist -l 5173 &
+
+      - name: Serve operator-pwa
+        run: npx --yes serve apps/operator-pwa/dist -l 5174 &
+
+      - name: Run E2E tests
+        run: pnpm test
+        env:
+          TEST_BACKOFFICE_URL: http://localhost:5173
+          TEST_OPERATOR_URL: http://localhost:5174
+          # Auth credentials are optional — tests skip gracefully if absent
+          TEST_BACKOFFICE_EMAIL: ${{ secrets.TEST_BACKOFFICE_EMAIL }}
+          TEST_BACKOFFICE_PASSWORD: ${{ secrets.TEST_BACKOFFICE_PASSWORD }}
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: apps/e2e/playwright-report/
+          retention-days: 7
+
   # ── domain + types packages ────────────────────────────────────────────────
   packages:
     name: packages

@@ -16,6 +16,8 @@
     "typecheck": "pnpm -r typecheck",
     "test:api": "pnpm --filter @erp/edge-api test",
     "test:watch:api": "pnpm --filter @erp/edge-api test:watch",
+    "test:e2e": "pnpm --filter @erp/e2e test",
+    "test:e2e:ui": "pnpm --filter @erp/e2e test:ui",
     "test": "pnpm run test:api",
     "test:watch": "pnpm run test:watch:api"
   }

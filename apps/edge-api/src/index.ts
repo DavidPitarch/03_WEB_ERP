@@ -51,8 +51,12 @@ import { encuestasRoutes } from './routes/encuestas';
 import { eventosRoutes } from './routes/eventos';
 import { plantillasDocumentoRoutes } from './routes/plantillas-documento';
 import { gruposCamposRoutes } from './routes/grupos-campos';
+import { operariosRoutes } from './routes/operarios';
+import { baremosPlantillaRoutes } from './routes/baremos-plantilla';
+import { siniestrosRoutes } from './routes/siniestros';
 import { authMiddleware } from './middleware/auth';
 import { requireRoles } from './middleware/roles';
+import { checkRateLimit } from './services/rate-limiter';
 import { OFFICE_ROLES, OPERATOR_ROLES, PERITO_ROUTE_ROLES, VIDEOPERITACION_ROLES } from './security/role-groups';
 import { scheduled } from './scheduled';
 import type { Env } from './types';
@@ -96,21 +100,20 @@ app.get('/health', (c) => {
   }, degraded ? 207 : 200);
 });
 
-// ─── Rate limiter for public endpoints ───
-const rateLimitMap = new Map<string, { count: number; reset: number }>();
-
-function rateLimit(limit: number, windowMs: number) {
+// ─── Rate limiter para endpoints públicos (KV distribuido + fallback in-memory) ───
+function rateLimit(limit: number, windowMs: number, endpointKey?: string) {
   return async (c: any, next: any) => {
     const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown';
-    const now = Date.now();
-    const entry = rateLimitMap.get(ip);
-    if (!entry || now > entry.reset) {
-      rateLimitMap.set(ip, { count: 1, reset: now + windowMs });
-    } else {
-      entry.count++;
-      if (entry.count > limit) {
-        return c.json({ data: null, error: { code: 'RATE_LIMITED', message: 'Demasiadas solicitudes' } }, 429);
-      }
+    const endpoint = endpointKey ?? c.req.path;
+    const allowed = await checkRateLimit(
+      c.env?.RATE_LIMIT_KV,
+      ip,
+      endpoint,
+      limit,
+      Math.ceil(windowMs / 1000),
+    );
+    if (!allowed) {
+      return c.json({ data: null, error: { code: 'RATE_LIMITED', message: 'Demasiadas solicitudes. Inténtalo más tarde.' } }, 429);
     }
     await next();
   };
@@ -118,7 +121,7 @@ function rateLimit(limit: number, windowMs: number) {
 
 // ─── Public routes (no auth) ───
 // Pedido confirmation via magic link — rate limited
-app.post('/api/v1/public/pedidos/:id/confirmar', rateLimit(20, 60_000), async (c) => {
+app.post('/api/v1/public/pedidos/:id/confirmar', rateLimit(20, 60_000, 'pedidos-confirmar'), async (c) => {
   const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
   const id = c.req.param('id');
   const { token } = await c.req.json<{ token: string }>();
@@ -146,13 +149,13 @@ app.post('/api/v1/public/pedidos/:id/confirmar', rateLimit(20, 60_000), async (c
 
 // Public VP webhook endpoint — rate limited, no auth
 app.route('/api/v1/public/videoperitacion/webhooks', vpWebhooksRoutes);
-app.use('/api/v1/public/customer-tracking', rateLimit(30, 60_000));
-app.use('/api/v1/public/customer-tracking/*', rateLimit(30, 60_000));
+app.use('/api/v1/public/customer-tracking', rateLimit(30, 60_000, 'customer-tracking'));
+app.use('/api/v1/public/customer-tracking/*', rateLimit(30, 60_000, 'customer-tracking'));
 app.route('/api/v1/public/customer-tracking', customerTrackingPublicRoutes);
 
 // Autocita public routes — stricter rate limit (10 req/min per IP)
-app.use('/api/v1/public/autocita', rateLimit(10, 60_000));
-app.use('/api/v1/public/autocita/*', rateLimit(10, 60_000));
+app.use('/api/v1/public/autocita', rateLimit(10, 60_000, 'autocita'));
+app.use('/api/v1/public/autocita/*', rateLimit(10, 60_000, 'autocita'));
 app.route('/api/v1/public/autocita', autocitaPublicRoutes);
 
 // Protected routes
@@ -211,6 +214,9 @@ protectRouteGroup('/encuestas', requireRoles(['admin', 'supervisor']));
 protectRouteGroup('/eventos', requireRoles(['admin', 'supervisor']));
 protectRouteGroup('/plantillas-documento', requireRoles(['admin', 'supervisor']));
 protectRouteGroup('/grupos-campos', requireRoles(['admin', 'supervisor']));
+protectRouteGroup('/operarios-mgmt', requireRoles(['admin', 'supervisor', 'tramitador']));
+protectRouteGroup('/baremos-plantilla', requireRoles(['admin', 'supervisor', 'tramitador', 'financiero']));
+protectRouteGroup('/siniestros', requireRoles(OFFICE_ROLES));
 api.use('/facturas/:id/registrar-cobro', requireRoles(['admin', 'financiero']));
 api.use('/facturas/:id/registrar-cobro/*', requireRoles(['admin', 'financiero']));
 api.route('/expedientes', expedientesRoutes);
@@ -262,6 +268,9 @@ api.route('/encuestas', encuestasRoutes);
 api.route('/eventos', eventosRoutes);
 api.route('/plantillas-documento', plantillasDocumentoRoutes);
 api.route('/grupos-campos', gruposCamposRoutes);
+api.route('/operarios-mgmt', operariosRoutes);
+api.route('/baremos-plantilla', baremosPlantillaRoutes);
+api.route('/siniestros', siniestrosRoutes);
 
 app.route('/api/v1', api);
 

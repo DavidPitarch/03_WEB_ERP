@@ -75,6 +75,17 @@ import { CentralitaPage } from '@/pages/CentralitaPage';
 import { LineasFacturacionPage } from '@/pages/LineasFacturacionPage';
 import { GestionDocumentosPage } from '@/pages/GestionDocumentosPage';
 import { GestionCamposPage } from '@/pages/GestionCamposPage';
+import { OperarioFormPage } from '@/pages/OperarioFormPage';
+import { ProveedorFormPage } from '@/pages/ProveedorFormPage';
+// Módulo Servicios / Operaciones
+import { OperacionesEscritorioPage } from '@/pages/OperacionesEscritorioPage';
+import { PlanningBloqueosPage } from '@/pages/PlanningBloqueosPage';
+import { MultiasistenciaPage } from '@/pages/MultiasistenciaPage';
+import { InformeOperacionesPage } from '@/pages/InformeOperacionesPage';
+// Módulo Siniestros
+import { SiniestrosActivosPage } from '@/pages/SiniestrosActivosPage';
+import { SiniestrosFinalizadosPage } from '@/pages/SiniestrosFinalizadosPage';
+import { SiniestroSeguimientoPage } from '@/pages/SiniestroSeguimientoPage';
 
 export function App() {
   const { user, loading } = useAuth();
@@ -138,6 +149,8 @@ export function App() {
         <Route path="/pedidos/caducados" element={<PedidosCaducadosPage />} />
         <Route path="/pedidos/:id" element={<PedidoDetailPage />} />
         <Route path="/proveedores" element={<ProveedoresPage />} />
+        <Route path="/proveedores/nuevo" element={<ProveedorFormPage />} />
+        <Route path="/proveedores/:id" element={<ProveedorFormPage />} />
 
         {/* Reporting */}
         <Route path="/dashboard" element={<DashboardPage />} />
@@ -157,6 +170,8 @@ export function App() {
         <Route path="/clientes" element={<ClientesPage />} />
         <Route path="/empresas" element={<EmpresasPage />} />
         <Route path="/operarios-config" element={<OperariosConfigPage />} />
+        <Route path="/operarios-config/nuevo" element={<OperarioFormPage />} />
+        <Route path="/operarios-config/:id" element={<OperarioFormPage />} />
         <Route path="/especialidades" element={<EspecialidadesPage />} />
         <Route path="/calendario" element={<CalendarioOperativoPage />} />
         <Route path="/baremos" element={<BaremosPage />} />
@@ -204,13 +219,23 @@ export function App() {
         {/* Perfil de usuario */}
         <Route path="/perfil" element={<PerfilPage />} />
 
+        {/* Módulo Servicios / Operaciones */}
+        <Route path="/servicios/escritorio" element={<OperacionesEscritorioPage />} />
+        <Route path="/servicios/activos" element={<SiniestrosActivosPage />} />
+        <Route path="/servicios/finalizados" element={<SiniestrosFinalizadosPage />} />
+        <Route path="/servicios/:id/seguimiento" element={<SiniestroSeguimientoPage />} />
+        <Route path="/planning/bloqueos" element={<PlanningBloqueosPage />} />
+        <Route path="/servicios/multiasistencia" element={<MultiasistenciaPage />} />
+        <Route path="/servicios/autofacturas-interpwgs" element={<PlaceholderPage moduleName="Autofacturas INTERPWGS" description="Gestión de autofacturas recibidas desde la plataforma INTERPWGS. Importación, validación y contabilización de autofacturas externas." status="new" />} />
+        <Route path="/servicios/informes/:reportId" element={<InformeOperacionesPage />} />
+
         {/* Legacy - mantener compatibilidad */}
         <Route path="/maestros" element={<MaestrosPage />} />
 
         {/* ── Rutas placeholder — módulos en backlog ── */}
         <Route path="/comunicaciones"     element={<PlaceholderPage moduleName="Comunicaciones" description="Bandeja de comunicaciones con asegurados y compañías. La API existe." status="partial" />} />
         <Route path="/presupuestos"       element={<PlaceholderPage moduleName="Presupuestos" description="Lista de presupuestos. El detalle (/presupuestos/:id) ya está implementado." status="partial" />} />
-        <Route path="/operarios"          element={<Navigate to="/operarios-config" replace />} />
+        <Route path="/operarios"           element={<Navigate to="/operarios-config" replace />} />
         <Route path="/rentings"           element={<PlaceholderPage moduleName="Rentings" description="Gestión de contratos de renting asociados a siniestros." status="new" />} />
         <Route path="/correo/cuentas"     element={<CorreosPage />} />
         <Route path="/correo/configuracion" element={<PlaceholderPage moduleName="Configuración correo" description="Plantillas, reglas de enrutamiento y configuración de email transaccional." status="new" />} />

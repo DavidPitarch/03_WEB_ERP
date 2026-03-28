@@ -1,299 +1,211 @@
-import { useState, type FormEvent } from 'react';
-import { useProveedores, useCrearProveedor, useUpdateProveedor } from '@/hooks/useProveedores';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useProveedores, useDeleteProveedor, type ProveedoresFilters } from '@/hooks/useProveedores';
+
+const PER_PAGE = 10;
 
 export function ProveedoresPage() {
-  const [search, setSearch] = useState('');
-  const [activoFilter, setActivoFilter] = useState<'' | 'true' | 'false'>('');
-  const [showCreate, setShowCreate] = useState(false);
-  const [editRow, setEditRow] = useState<any>(null);
-
-  const { data, isLoading } = useProveedores({
-    search: search || undefined,
-    activo: activoFilter === '' ? undefined : activoFilter === 'true',
+  const navigate = useNavigate();
+  const [searchInput, setSearchInput] = useState('');
+  const [filters, setFilters] = useState<ProveedoresFilters>({
+    page: 1,
+    per_page: PER_PAGE,
   });
 
-  const items: any[] = data && 'data' in data ? (data.data as any[]) ?? [] : [];
+  const { data: res, isLoading } = useProveedores(filters);
+  const deleteMut = useDeleteProveedor();
+
+  const result = res && 'data' in res ? (res.data as any) : null;
+  const items: any[] = result?.items ?? [];
+  const totalPages: number = result?.total_pages ?? 0;
+
+  function applySearch() {
+    setFilters((f) => ({ ...f, search: searchInput || undefined, page: 1 }));
+  }
+
+  function setPage(page: number) {
+    setFilters((f) => ({ ...f, page }));
+  }
+
+  async function handleDelete(id: string, nombre: string) {
+    if (!window.confirm(`¿Desea borrar este PROVEEDOR?\n\n"${nombre}"`)) return;
+    await deleteMut.mutateAsync(id);
+  }
+
+  function renderPagination() {
+    if (totalPages <= 1) return null;
+    const currentPage = filters.page ?? 1;
+    const buttons = [];
+    for (let p = 1; p <= totalPages; p++) {
+      buttons.push(
+        <a
+          key={p}
+          href="#"
+          onClick={(e) => { e.preventDefault(); setPage(p); }}
+          style={{
+            marginRight: 4,
+            fontWeight: currentPage === p ? 'bold' : 'normal',
+            color: '#333',
+            textDecoration: currentPage === p ? 'none' : 'underline',
+          }}
+        >
+          {p}
+        </a>
+      );
+    }
+    if (currentPage < totalPages) {
+      buttons.push(
+        <a
+          key="next"
+          href="#"
+          onClick={(e) => { e.preventDefault(); setPage(currentPage + 1); }}
+          style={{ marginRight: 4, color: '#333', textDecoration: 'underline' }}
+        >
+          &gt;&gt;
+        </a>
+      );
+    }
+    return (
+      <div style={{ marginTop: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+          {buttons}
+        </div>
+        <div style={{ fontSize: 12, color: '#555', marginTop: 4 }}>
+          Página {currentPage} de {totalPages}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="page-proveedores">
-      <div className="page-header">
-        <h2>Proveedores</h2>
-        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>Nuevo proveedor</button>
-      </div>
+    <div style={{ fontFamily: 'Verdana, Arial, Helvetica, sans-serif', background: '#fff', padding: 16 }}>
+      {/* Tabla contenedora principal */}
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        {/* Cabecera / Título */}
+        <thead>
+          <tr>
+            <td
+              colSpan={3}
+              style={{
+                backgroundColor: '#333',
+                color: '#f4fcc0',
+                fontSize: 14,
+                fontWeight: 700,
+                padding: '6px 10px',
+              }}
+            >
+              Listado de Proveedores
+            </td>
+          </tr>
+        </thead>
+        <tbody>
+          {/* Barra de búsqueda */}
+          <tr>
+            <td colSpan={3} style={{ padding: '8px 0' }}>
+              <form
+                onSubmit={(e) => { e.preventDefault(); applySearch(); }}
+                style={{ display: 'flex', gap: 6, alignItems: 'center' }}
+              >
+                <input
+                  type="text"
+                  name="busca_proveedor"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="Buscar proveedor..."
+                  style={{
+                    width: 166,
+                    background: '#f9f9f9',
+                    border: '1px solid #999',
+                    fontSize: 12,
+                    padding: 2,
+                    color: '#333',
+                  }}
+                />
+                <input
+                  type="submit"
+                  value="Buscar"
+                  style={{ fontSize: 12, cursor: 'pointer', padding: '2px 8px' }}
+                />
+              </form>
+            </td>
+          </tr>
 
-      <div className="filters-bar">
-        <input
-          type="search"
-          placeholder="Buscar por nombre, CIF, email..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="search-input"
-        />
-        <select
-          value={activoFilter}
-          onChange={(e) => setActivoFilter(e.target.value as '' | 'true' | 'false')}
-          className="filter-select"
-        >
-          <option value="">Todos</option>
-          <option value="true">Activos</option>
-          <option value="false">Inactivos</option>
-        </select>
-      </div>
+          {/* Botón alta */}
+          <tr>
+            <td colSpan={3} style={{ textAlign: 'center', padding: '6px 0' }}>
+              <input
+                type="button"
+                name="anyadir_proveedor"
+                value="Añadir Proveedor"
+                onClick={() => navigate('/proveedores/nuevo')}
+                style={{ fontSize: 12, cursor: 'pointer', padding: '3px 12px' }}
+              />
+            </td>
+          </tr>
 
-      {isLoading ? (
-        <div className="loading">Cargando proveedores...</div>
-      ) : items.length === 0 ? (
-        <div className="empty-state">No se encontraron proveedores</div>
-      ) : (
-        <table className="data-table">
-          <thead>
+          {/* Filas de datos */}
+          {isLoading ? (
             <tr>
-              <th>Nombre</th>
-              <th>Email</th>
-              <th>Teléfono</th>
-              <th>Canal preferido</th>
-              <th>Especialidades</th>
-              <th>Activo</th>
+              <td colSpan={3} style={{ padding: 16, fontSize: 12 }}>Cargando proveedores...</td>
             </tr>
-          </thead>
-          <tbody>
-            {items.map((p: any) => (
-              <tr key={p.id} onClick={() => setEditRow(p)} style={{ cursor: 'pointer' }}>
-                <td><strong>{p.nombre}</strong></td>
-                <td>{p.email ?? '—'}</td>
-                <td>{p.telefono ?? '—'}</td>
-                <td>{p.canal_preferido ?? '—'}</td>
-                <td>
-                  {(p.especialidades ?? []).map((esp: string) => (
-                    <span key={esp} className="badge" style={{ backgroundColor: '#6366f1', marginRight: 4 }}>{esp}</span>
-                  ))}
+          ) : items.length === 0 ? (
+            <tr>
+              <td colSpan={3} style={{ padding: 16, fontSize: 12, color: '#666' }}>No se encontraron proveedores</td>
+            </tr>
+          ) : (
+            items.map((p: any) => (
+              <tr key={p.id} style={{ backgroundColor: '#DBDBDB' }}>
+                <td
+                  style={{
+                    width: 378,
+                    padding: '4px 6px',
+                    fontFamily: 'Verdana, Arial, Helvetica, sans-serif',
+                    fontSize: 12,
+                    color: '#333',
+                  }}
+                >
+                  {p.nombre}
                 </td>
-                <td>
-                  <span className="badge" style={{ backgroundColor: p.activo ? '#22c55e' : '#9ca3af' }}>
-                    {p.activo ? 'Activo' : 'Inactivo'}
-                  </span>
+                <td
+                  style={{
+                    width: 60,
+                    textAlign: 'center',
+                    fontFamily: 'Verdana, Arial, Helvetica, sans-serif',
+                    fontSize: 12,
+                  }}
+                >
+                  <a
+                    href="#"
+                    onClick={(e) => { e.preventDefault(); navigate(`/proveedores/${p.id}`); }}
+                    style={{ color: '#333' }}
+                  >
+                    Editar
+                  </a>
+                </td>
+                <td
+                  style={{
+                    width: 60,
+                    textAlign: 'center',
+                    fontFamily: 'Verdana, Arial, Helvetica, sans-serif',
+                    fontSize: 12,
+                  }}
+                >
+                  <a
+                    href="#"
+                    onClick={(e) => { e.preventDefault(); handleDelete(p.id, p.nombre); }}
+                    style={{ color: '#333' }}
+                  >
+                    Borrar
+                  </a>
                 </td>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            ))
+          )}
+        </tbody>
+      </table>
 
-      {showCreate && <CreateProveedorModal onClose={() => setShowCreate(false)} />}
-      {editRow && <EditProveedorModal proveedor={editRow} onClose={() => setEditRow(null)} />}
-    </div>
-  );
-}
-
-function CreateProveedorModal({ onClose }: { onClose: () => void }) {
-  const crear = useCrearProveedor();
-  const [nombre, setNombre] = useState('');
-  const [cif, setCif] = useState('');
-  const [telefono, setTelefono] = useState('');
-  const [email, setEmail] = useState('');
-  const [direccion, setDireccion] = useState('');
-  const [cp, setCp] = useState('');
-  const [localidad, setLocalidad] = useState('');
-  const [provincia, setProvincia] = useState('');
-  const [canalPreferido, setCanalPreferido] = useState('');
-  const [especialidades, setEspecialidades] = useState('');
-  const [notas, setNotas] = useState('');
-
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    crear.mutate(
-      {
-        nombre,
-        cif: cif || undefined,
-        telefono: telefono || undefined,
-        email: email || undefined,
-        direccion: direccion || undefined,
-        cp: cp || undefined,
-        localidad: localidad || undefined,
-        provincia: provincia || undefined,
-        canal_preferido: canalPreferido || undefined,
-        especialidades: especialidades ? especialidades.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
-        notas: notas || undefined,
-      },
-      { onSuccess: () => onClose() },
-    );
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Nuevo proveedor</h3>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Nombre *</label>
-            <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
-          </div>
-          <div className="form-group">
-            <label>CIF</label>
-            <input type="text" value={cif} onChange={(e) => setCif(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Teléfono</label>
-            <input type="text" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Dirección</label>
-            <input type="text" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Código postal</label>
-            <input type="text" value={cp} onChange={(e) => setCp(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Localidad</label>
-            <input type="text" value={localidad} onChange={(e) => setLocalidad(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Provincia</label>
-            <input type="text" value={provincia} onChange={(e) => setProvincia(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Canal preferido</label>
-            <select value={canalPreferido} onChange={(e) => setCanalPreferido(e.target.value)}>
-              <option value="">— Seleccionar —</option>
-              <option value="email">Email</option>
-              <option value="telefono">Teléfono</option>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="portal">Portal</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Especialidades (separadas por coma)</label>
-            <input type="text" value={especialidades} onChange={(e) => setEspecialidades(e.target.value)} placeholder="fontanería, electricidad, pintura" />
-          </div>
-          <div className="form-group">
-            <label>Notas</label>
-            <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={3} />
-          </div>
-          <div className="modal-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={crear.isPending}>
-              {crear.isPending ? 'Guardando...' : 'Crear proveedor'}
-            </button>
-          </div>
-          {crear.isError && <div className="form-error">Error al crear el proveedor</div>}
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function EditProveedorModal({ proveedor, onClose }: { proveedor: any; onClose: () => void }) {
-  const update = useUpdateProveedor();
-  const [nombre, setNombre] = useState(proveedor.nombre ?? '');
-  const [cif, setCif] = useState(proveedor.cif ?? '');
-  const [telefono, setTelefono] = useState(proveedor.telefono ?? '');
-  const [email, setEmail] = useState(proveedor.email ?? '');
-  const [direccion, setDireccion] = useState(proveedor.direccion ?? '');
-  const [cp, setCp] = useState(proveedor.cp ?? '');
-  const [localidad, setLocalidad] = useState(proveedor.localidad ?? '');
-  const [provincia, setProvincia] = useState(proveedor.provincia ?? '');
-  const [canalPreferido, setCanalPreferido] = useState(proveedor.canal_preferido ?? '');
-  const [especialidades, setEspecialidades] = useState((proveedor.especialidades ?? []).join(', '));
-  const [notas, setNotas] = useState(proveedor.notas ?? '');
-  const [activo, setActivo] = useState(proveedor.activo ?? true);
-
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    update.mutate(
-      {
-        id: proveedor.id,
-        nombre,
-        cif: cif || undefined,
-        telefono: telefono || undefined,
-        email: email || undefined,
-        direccion: direccion || undefined,
-        cp: cp || undefined,
-        localidad: localidad || undefined,
-        provincia: provincia || undefined,
-        canal_preferido: canalPreferido || undefined,
-        especialidades: especialidades ? especialidades.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
-        notas: notas || undefined,
-        activo,
-      },
-      { onSuccess: () => onClose() },
-    );
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Editar proveedor</h3>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Nombre *</label>
-            <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
-          </div>
-          <div className="form-group">
-            <label>CIF</label>
-            <input type="text" value={cif} onChange={(e) => setCif(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Teléfono</label>
-            <input type="text" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Dirección</label>
-            <input type="text" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Código postal</label>
-            <input type="text" value={cp} onChange={(e) => setCp(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Localidad</label>
-            <input type="text" value={localidad} onChange={(e) => setLocalidad(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Provincia</label>
-            <input type="text" value={provincia} onChange={(e) => setProvincia(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Canal preferido</label>
-            <select value={canalPreferido} onChange={(e) => setCanalPreferido(e.target.value)}>
-              <option value="">— Seleccionar —</option>
-              <option value="email">Email</option>
-              <option value="telefono">Teléfono</option>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="portal">Portal</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Especialidades (separadas por coma)</label>
-            <input type="text" value={especialidades} onChange={(e) => setEspecialidades(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Notas</label>
-            <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={3} />
-          </div>
-          <div className="form-group">
-            <label>
-              <input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} />
-              {' '}Activo
-            </label>
-          </div>
-          <div className="modal-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={update.isPending}>
-              {update.isPending ? 'Guardando...' : 'Guardar cambios'}
-            </button>
-          </div>
-          {update.isError && <div className="form-error">Error al actualizar el proveedor</div>}
-        </form>
-      </div>
+      {/* Paginación */}
+      {renderPagination()}
     </div>
   );
 }

@@ -123,15 +123,101 @@ export interface EmpresaFacturadora {
 
 export interface Operario {
   id: string;
-  user_id: string;
+  user_id: string | null;
   nombre: string;
   apellidos: string;
   telefono: string;
-  email: string;
+  email: string | null;
   gremios: string[];
   zonas_cp: string[];
   activo: boolean;
   created_at: string;
+  updated_at?: string;
+  // Datos personales
+  razon_social?: string | null;
+  direccion?: string | null;
+  poblacion?: string | null;
+  ciudad?: string | null;
+  codigo_postal?: string | null;
+  provincia?: string | null;
+  telf2?: string | null;
+  fax?: string | null;
+  tipo_identificacion?: string | null;
+  nif?: string | null;
+  persona_contacto?: string | null;
+  // Datos bancarios
+  iban_1?: string | null;
+  iban_2?: string | null;
+  iban_3?: string | null;
+  iban_4?: string | null;
+  iban_5?: string | null;
+  iban_6?: string | null;
+  numero_entidad?: string | null;
+  numero_oficina?: string | null;
+  numero_control?: string | null;
+  numero_cuenta?: string | null;
+  cuenta_bancaria?: string | null;
+  // Datos fiscales
+  subcuenta_operario?: string | null;
+  prefijo_autofactura?: string | null;
+  tipo_operario?: string | null;
+  nomina?: number | null;
+  precio_hora?: number | null;
+  // Config financiera
+  irpf?: boolean;
+  tipo_descuento?: string | null;
+  descuento_negociado?: number | null;
+  permitir_incrementos?: boolean;
+  // Comunicaciones
+  automatico_sms?: boolean;
+  automatico_email?: boolean;
+  opcion_finaliza_visita?: boolean;
+  supervisor?: boolean;
+  bloquear_fotos?: boolean;
+  // APP móvil
+  usa_app_movil?: boolean;
+  ocultar_baremo_app?: boolean;
+  ocultar_precio_baremo?: boolean;
+  fichaje_activo?: boolean;
+  horas_convenio_dia?: number | null;
+  jornada_laboral?: string | null;
+  plataforma_pas?: boolean;
+  app_pwgs?: boolean;
+  // Opciones generales
+  preferente?: boolean;
+  establecer_iva?: boolean;
+  iva_operario?: number | null;
+  puede_segunda_visita?: boolean;
+  genera_presupuestos?: string | null;
+  autoaprobado?: boolean;
+  mostrar_datos_perito?: boolean;
+  observaciones?: string | null;
+  // Acceso intranet
+  usuario_intranet?: string | null;
+  contrasena_intranet?: string | null;
+  email_aplicacion?: string | null;
+  contrasena_email_app?: string | null;
+  // Foto
+  foto_path?: string | null;
+  // Arrays
+  tipos_servicio?: string[];
+  // Estado especial
+  bloqueado?: boolean;
+  es_subcontratado?: boolean;
+}
+
+export interface OperarioEspecialidad {
+  id: string;
+  operario_id: string;
+  especialidad_id: string;
+  es_principal: boolean;
+  created_at: string;
+  especialidades?: {
+    id: string;
+    nombre: string;
+    codigo: string | null;
+    activa: boolean;
+  };
 }
 
 export interface Cita {
@@ -1036,17 +1122,33 @@ export type PedidoEstado = (typeof PEDIDO_ESTADOS)[number];
 export interface Proveedor {
   id: string;
   nombre: string;
+  tipo_identificacion: 'N.I.F.' | 'C.I.F.' | 'N.I.E.' | 'OTROS' | null;
   cif: string | null;
   telefono: string | null;
+  fax: string | null;
   email: string | null;
   direccion: string | null;
   codigo_postal: string | null;
   localidad: string | null;
   provincia: string | null;
+  iban_1: string | null;
+  iban_2: string | null;
+  iban_3: string | null;
+  iban_4: string | null;
+  iban_5: string | null;
+  iban_6: string | null;
+  limite_dias: number | null;
+  utiliza_panel: boolean;
+  autofactura: boolean;
+  id_operario: string | null;
   canal_preferido: 'email' | 'portal' | 'telefono' | 'manual';
   especialidades: string[];
   activo: boolean;
   notas: string | null;
+  usuario: string | null;
+  contrasena: string | null;
+  email_app: string | null;
+  contrasena_email_app: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1113,16 +1215,77 @@ export interface CreatePedidoRequest {
 
 export interface CreateProveedorRequest {
   nombre: string;
+  tipo_identificacion?: 'N.I.F.' | 'C.I.F.' | 'N.I.E.' | 'OTROS';
   cif?: string;
   telefono?: string;
+  fax?: string;
   email?: string;
   direccion?: string;
   codigo_postal?: string;
   localidad?: string;
   provincia?: string;
+  iban_1?: string;
+  iban_2?: string;
+  iban_3?: string;
+  iban_4?: string;
+  iban_5?: string;
+  iban_6?: string;
+  limite_dias?: number;
+  utiliza_panel?: boolean;
+  autofactura?: boolean;
+  id_operario?: string;
   canal_preferido?: 'email' | 'portal' | 'telefono' | 'manual';
   especialidades?: string[];
   notas?: string;
+  usuario?: string;
+  contrasena?: string;
+  email_app?: string;
+  contrasena_email_app?: string;
+}
+
+// ─── Baremos Plantilla (gestión de tarifas: Cliente / Operario / Proveedor) ───
+
+export type BaremoTipo = 'Cliente' | 'Operario' | 'Proveedor';
+
+export interface BaremoPlantilla {
+  id: string;
+  nombre: string;
+  tipo: BaremoTipo;
+  fecha_inicio: string; // ISO date YYYY-MM-DD
+  fecha_fin: string;    // ISO date YYYY-MM-DD
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BaremoPlantillaTrabajo {
+  id: string;
+  baremo_id: string;
+  codigo: string | null;
+  codigo_relacion: string | null;
+  nombre: string;
+  precio_cliente: number | null;   // solo tipo Cliente
+  precio_operario: number;
+  precio_libre: boolean;
+  solo_operario: boolean;          // solo tipo Cliente
+  cantidad_fija: number;
+  especialidad_id: string | null;
+  created_at: string;
+  especialidades?: { id: string; nombre: string } | null;
+}
+
+export interface BaremoPlantillaProveedor {
+  id: string;
+  baremo_id: string;
+  proveedor_id: string;
+  created_at: string;
+  proveedores?: { id: string; nombre: string } | null;
+}
+
+export interface CreateBaremoPlantillaRequest {
+  nombre: string;
+  tipo: BaremoTipo;
+  fecha_inicio: string;
+  fecha_fin: string;
 }
 
 // ─── EP-10: BI, Reporting y Autofacturación ───
@@ -2221,4 +2384,879 @@ export interface TramitadorReglaPreasignacion {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MÓDULO SINIESTROS — tipos para las vistas operativas Activos / Finalizados /
+// Seguimiento. Estos tipos son la vista desnormalizada que devuelve la API para
+// renderizar las tablas y la ficha de seguimiento del expediente.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const ESTADOS_ACTIVOS = [
+  'NUEVO', 'NO_ASIGNADO', 'EN_PLANIFICACION', 'EN_CURSO',
+  'PENDIENTE', 'PENDIENTE_MATERIAL', 'PENDIENTE_PERITO', 'PENDIENTE_CLIENTE',
+] as const;
+
+export const ESTADOS_FINALIZADOS = [
+  'FINALIZADO', 'FACTURADO', 'COBRADO', 'CERRADO',
+] as const;
+
+export const TIPOS_DANO = [
+  'AGUA', 'ELECTRICIDAD', 'INCENDIO', 'MANTENIMIENTO',
+  'ROTURA LOZA SANITARIA', 'MARMOL/CRISTALES', 'CONEXION',
+  'ASISTENCIA', 'PISOS TURISTICOS', 'RESTO',
+  'VIDEOPERITACION', 'Servicio Prestación',
+  'ACTIVOS ADECUACIONES', 'ACTIVOS INCIDENTAL',
+] as const;
+
+export type TipoDano = (typeof TIPOS_DANO)[number];
+
+// ── Filtros de búsqueda ───────────────────────────────────────────────────────
+
+export interface SiniestrosActivosFilters {
+  search?: string;
+  tipo?: string;           // filtro tipos (Calidad, FRAUDE, +30 dias, etc.)
+  urgente?: boolean;
+  vip?: boolean;
+  tipo_dano?: string;
+  estado?: string;         // estado FSM o sub-estado
+  tramitador_id?: string;
+  operario_id?: string;
+  page?: number;
+  per_page?: number;
+}
+
+export interface SiniestrosFinalizadosFilters extends SiniestrosActivosFilters {
+  pendientes_cobrar?: boolean;
+  tipo_factura?: 'Factura' | 'Abono' | 'Albarán' | 'Presupuesto';
+  serie_factura?: string;
+  numero_factura?: string;
+  anyo_factura?: string;
+  importe_desde?: number;
+  importe_hasta?: number;
+  facturas_enviadas?: boolean;
+  facturas_cobradas?: boolean;
+}
+
+// ── Fila en la tabla de activos ───────────────────────────────────────────────
+
+export interface SiniestroActivoRow {
+  id: string;
+  numero_expediente: string;
+  codigo_externo: string | null;
+  compania: { id: string; nombre: string; codigo: string };
+  estado: ExpedienteEstado;
+  tramitador: { id: string; nombre: string; apellidos: string } | null;
+  tipo_dano: string;
+  etiquetas: string[];
+  urgente: boolean;
+  vip: boolean;
+  pausado: boolean;
+  fecha_alta_asegurado: string | null;
+  dias_apertura: number;
+  fecha_espera: string | null;
+  fecha_espera_vencida: boolean;
+  dias_sin_actualizar: number;
+  asegurado: { nombre: string; apellidos: string };
+  operario: { id: string; nombre: string; apellidos: string } | null;
+  perito_asignado: boolean;
+  tiene_trabajos: boolean;
+  tiene_trabajos_reclamados: boolean;
+  tiene_presupuesto: boolean;
+  tiene_factura: boolean;
+}
+
+// ── Fila en la tabla de finalizados (extiende activos + datos financieros) ────
+
+export interface SiniestroFacturaRow {
+  id: string;
+  numero_factura: string;
+  tipo: 'Factura' | 'Abono' | 'Albarán' | 'Presupuesto';
+  base_imponible: number;
+  iva: number;
+  total: number;
+  enviada: boolean;
+  fecha_autorizacion: string | null;
+  cobrada: boolean;
+  fecha_emision: string | null;
+  fecha_factura: string | null;
+}
+
+export interface SiniestroFinalizadoRow extends SiniestroActivoRow {
+  fecha_emision_factura: string | null;
+  fecha_factura: string | null;
+  facturas: SiniestroFacturaRow[];
+}
+
+// ── Paginación genérica de listas ─────────────────────────────────────────────
+
+export interface SiniestrosListResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+export type SiniestrosActivosResult = SiniestrosListResult<SiniestroActivoRow>;
+export type SiniestrosFinalizadosResult = SiniestrosListResult<SiniestroFinalizadoRow>;
+
+// ── Estadísticas por estado (para contadores en filtro desplegable) ────────────
+
+export interface SiniestroEstadoCounter {
+  estado: string;
+  total: number;
+}
+
+// ── Detalle completo para la ficha de seguimiento ────────────────────────────
+
+export interface SeguimientoAsegurado {
+  id: string;
+  nombre: string;
+  apellidos: string;
+  // Teléfono 1
+  telefono: string | null;
+  telefono_desc: string | null;
+  telefono_movil?: boolean;
+  // Teléfono 2
+  telefono2: string | null;
+  telefono2_desc: string | null;
+  telefono2_movil?: boolean;
+  // Teléfono 3 (B1-S5)
+  telefono3?: string | null;
+  telefono3_desc?: string | null;
+  telefono3_movil?: boolean;
+  // Prioridad: 1=Tel1, 2=Tel2, 3=Tel3
+  telefono_prioridad?: number;
+  // Email
+  email: string | null;
+  // Consentimiento
+  consentimiento_com: 'acepta' | 'rechaza' | null;
+  consentimiento_tipo?: 'sms' | 'email' | 'ambos' | null;
+  // Datos personales
+  nif: string | null;
+  direccion: string;
+  codigo_postal: string;
+  localidad: string;
+  provincia: string;
+}
+
+export interface SeguimientoVisita {
+  id: string;
+  fecha_hora: string;
+  estado: string;
+  notas: string | null;
+  /** G2: Datos adicionales por visita (campo libre) */
+  campo_2?: string | null;
+  operario: {
+    id: string;
+    nombre: string;
+    apellidos: string;
+    telefono: string;
+  } | null;
+  fotos_antes: Array<{ id: string; archivo: string; descripcion: string | null }>;
+  fotos_despues: Array<{ id: string; archivo: string; descripcion: string | null }>;
+}
+
+export interface SeguimientoPedido {
+  id: string;
+  numero_pedido: string | null;
+  proveedor: { id: string; nombre: string } | null;
+  descripcion: string;
+  fecha_creacion: string;
+  fecha_limite: string | null;
+  estado: string;
+}
+
+export interface SeguimientoIncidencia {
+  id: string;
+  fecha: string;
+  origen: string | null;
+  tipologia: string | null;
+  texto: string;
+  nivel_rga: string | null;
+  imputada_a: string | null;
+  procedente: boolean;
+  creado_por: string | null;
+  created_at: string;
+  // B3 extended fields
+  tipo_incidencia?: string | null;
+  plataforma_usuario_nombre?: string | null;
+  interna?: boolean;
+  proc_incidencia?: string | null;
+}
+
+export interface SeguimientoComunicacion {
+  id: string;
+  tipo: 'sms' | 'email' | 'llamada' | 'nota';
+  destinatario: string | null;
+  contenido: string;
+  fecha_envio: string;
+}
+
+export interface SeguimientoDocumento {
+  id: string;
+  tipo_documento: string;
+  archivo: string;
+  descripcion: string | null;
+  fecha_subida: string;
+  signed_url?: string;
+}
+
+export interface SeguimientoPresupuesto {
+  id: string;
+  numero: string | null;
+  estado: 'pendiente' | 'aprobado' | 'rechazado';
+  importe: number;
+  fecha_creacion: string;
+}
+
+export interface SeguimientoExpediente {
+  // ── Core ──────────────────────────────────────────────────────────────────
+  id: string;
+  numero_expediente: string;
+  codigo_externo: string | null;
+  tipo_dano: string;
+  /** G1: Especialidad del siniestro (carpintería, fontanería, etc.) */
+  especialidad?: string | null;
+  estado: ExpedienteEstado;
+  /** Estado operacional del tramitador, independiente del FSM estado (B1-S3) */
+  pendiente_de?: string | null;
+  etiquetas: string[];
+  pausado: boolean;
+  urgente: boolean;
+  vip: boolean;
+  fecha_espera: string | null;
+  fecha_alta_asegurado: string | null;
+  notas: string | null;
+  origen: string | null;
+  descripcion: string;
+  // ── Personas ──────────────────────────────────────────────────────────────
+  compania: { id: string; nombre: string; codigo: string };
+  asegurado: SeguimientoAsegurado;
+  tramitador: { id: string; nombre: string; apellidos: string } | null;
+  operario: {
+    id: string;
+    nombre: string;
+    apellidos: string;
+    telefono: string;
+  } | null;
+  perito: { id: string; nombre: string } | null;
+  // ── B1-S3: Tipos de compañía y eventos ────────────────────────────────────
+  tipos_compania?: TipoCompania[];
+  eventos?: EventoCompania[];
+  // ── B1-S1: Presencia / bloqueo ────────────────────────────────────────────
+  presencia?: ExpedientePresencia | null;
+  // ── Secciones operativas ──────────────────────────────────────────────────
+  visitas: SeguimientoVisita[];
+  pedidos: SeguimientoPedido[];
+  incidencias: SeguimientoIncidencia[];
+  comunicaciones: SeguimientoComunicacion[];
+  documentos: SeguimientoDocumento[];
+  presupuestos: SeguimientoPresupuesto[];
+  facturas: SiniestroFacturaRow[];
+  // ── B2: Bloque 2 (opcionales para retrocompatibilidad) ────────────────────
+  /** Trabajos con estado No iniciado / Subsanado (S8.4) */
+  trabajos?: TrabajoExpediente[];
+  /** Notas de tramitadores (S10) */
+  notas_tramitador?: NotaInterna[];
+  /** Notas de operarios (S10) */
+  notas_operario?: NotaInterna[];
+  /** Comunicaciones con la aseguradora / ASITUR (S9) */
+  comunicaciones_asitur?: ComunicacionAsitur[];
+  // ── B3: Bloque 3 (opcionales) ────────────────────────────────────────────
+  /** Campos adicionales para informe fotográfico (S13) */
+  campos_adicionales?: CamposAdicionalesExpediente | null;
+}
+
+// ── Requests de mutación ──────────────────────────────────────────────────────
+
+export interface UpdateSiniestroRequest {
+  tipo_dano?: string;
+  /** G1: Especialidad del siniestro */
+  especialidad?: string | null;
+  estado?: ExpedienteEstado;
+  tramitador_id?: string | null;
+  operario_id?: string | null;
+  pausado?: boolean;
+  urgente?: boolean;
+  vip?: boolean;
+  fecha_espera?: string | null;
+  notas?: string | null;
+  etiquetas?: string[];
+}
+
+export interface CreateIncidenciaRequest {
+  expediente_id: string;
+  fecha?: string;
+  origen?: string;
+  tipologia?: string;
+  texto: string;
+  nivel_rga?: string;
+  imputada_a?: string;
+  procedente?: boolean;
+  // B3 extended fields
+  tipo_incidencia?: string | null;
+  plataforma_usuario_nombre?: string | null;
+  interna?: boolean;
+  proc_incidencia?: string | null;
+}
+
+export interface UpdateFacturaSiniestroRequest {
+  factura_id: string;
+  enviada?: boolean;
+  cobrada?: boolean;
+  fecha_autorizacion?: string | null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MÓDULO SEGUIMIENTO — BLOQUE 1 (Secciones 1-5)
+// ═══════════════════════════════════════════════════════════════
+
+// ── S3: Opciones "Expediente pendiente de" (operacional, ≠ FSM estado) ────────
+export const PENDIENTE_DE_OPTIONS = [
+  // Estados de gestión
+  '1ª cita',
+  'Asegurado',
+  'Asegurado 1º contacto',
+  'ASIGNACION ANDALUCIA',
+  'ASIGNACIÓN VALENCIA',
+  'Autovisita Albañilería 1h',
+  'Autovisita Albañilería 2h',
+  'Autovisita Fontanería 90 min',
+  'Autovisita Pintura 1h',
+  'Autovisita Pintura 2h',
+  'Bricos',
+  'Compañía',
+  'Compañía Caser para cerrar',
+  'Compañía Multiasistencia para Cerrar',
+  'Confirmar cita',
+  'Control de cita',
+  'Encuesta de Calidad',
+  'Factura IPAS',
+  'Finalizado',
+  'Gestión factura',
+  'Gremio externo',
+  'Ingreso',
+  'Localizador Fugas',
+  'Materiales',
+  'Otra reparación',
+  'Perito',
+  'Perjudicado',
+  'Presupuesto',
+  'Reclamación',
+  'Resp. Técnico',
+  'Revisión tras visita',
+  'Técnico',
+  'Trabajos verticales',
+  'Valoración',
+  'Visita revisada',
+  // Especialidades técnicas
+  '72h SEGURCAIXA',
+  'Activos inmobiliarios',
+  'Albañilería',
+  'ASIGNACION HACER RUTA',
+  'ASIGNAR CITA ALBAÑILERIA',
+  'ASIGNAR CITA PINTURA',
+  'Caducados',
+  'CAMARA TERMOGRAFICA',
+  'Carpintería',
+  'Cerrajería',
+  'Cristalería',
+  'Electricidad',
+  'Fontanería',
+  'Gestión de cobro',
+  'Limpieza',
+  'Marmolería',
+  'Otros',
+  'Persianas',
+  'Pintura',
+  'Pladur',
+  'Revisión operario',
+  'Revisión tramitación',
+  'Saneamiento',
+  'Sellado bañera',
+  'Solador',
+  'Tapicería',
+  'Trabajos verticales',
+  'Valorar daños',
+  'Videoperitacion',
+] as const;
+
+export type PendienteDeOption = (typeof PENDIENTE_DE_OPTIONS)[number];
+
+// ── S1: Presencia / Bloqueo colaborativo ──────────────────────────────────────
+
+export interface ExpedientePresencia {
+  user_id: string;
+  user_nombre: string;
+  locked_at: string;
+  last_heartbeat: string;
+  /** true si el bloqueo es del usuario actual */
+  es_propio?: boolean;
+  /** true si el heartbeat tiene más de 2 minutos (bloqueo expirado) */
+  expirado?: boolean;
+}
+
+// ── S3: Tipos de compañía dinámicos ───────────────────────────────────────────
+
+export interface TipoCompania {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  orden: number;
+  /** true si este tipo está activo para el expediente actual */
+  seleccionado?: boolean;
+}
+
+// ── S3: Eventos ejecutables ────────────────────────────────────────────────────
+
+export interface EventoCompania {
+  id: string;
+  nombre: string;
+  tipo_evento: 'autovisita' | 'notificacion' | 'cambio_estado' | 'cambio_pendiente_de' | 'tarea';
+  configuracion: Record<string, unknown>;
+  orden: number;
+}
+
+// ── S5: Texto predefinido SMS/email ───────────────────────────────────────────
+
+export interface TextoPredefinido {
+  id: string;
+  tipo: 'sms' | 'email';
+  nombre: string;
+  asunto: string | null;
+  cuerpo: string;
+}
+
+// ── Extensiones de SeguimientoAsegurado (Bloque 1) ────────────────────────────
+// Se añaden campos opcionales para no romper el contrato existente.
+
+export interface SeguimientoAseguradoComunicaciones {
+  id: string;
+  nombre: string;
+  apellidos: string;
+  nif: string | null;
+  direccion: string;
+  codigo_postal: string;
+  localidad: string;
+  provincia: string;
+  // Teléfono 1
+  telefono: string | null;
+  telefono_desc: string | null;
+  telefono_movil: boolean;
+  // Teléfono 2
+  telefono2: string | null;
+  telefono2_desc: string | null;
+  telefono2_movil: boolean;
+  // Teléfono 3 (nuevo)
+  telefono3: string | null;
+  telefono3_desc: string | null;
+  telefono3_movil: boolean;
+  // Prioridad de contacto: 1=Tel1, 2=Tel2, 3=Tel3
+  telefono_prioridad: number;
+  // Email
+  email: string | null;
+  // Consentimiento
+  consentimiento_com: 'acepta' | 'rechaza' | null;
+  consentimiento_tipo: 'sms' | 'email' | 'ambos' | null;
+}
+
+// ── SeguimientoExpediente extendido (Bloque 1) ────────────────────────────────
+
+export interface SeguimientoExpedienteB1 extends SeguimientoExpediente {
+  /** Estado operacional del tramitador (≠ FSM estado) */
+  pendiente_de: string | null;
+  /** Tipos de compañía disponibles y cuáles están activos para este expediente */
+  tipos_compania: TipoCompania[];
+  /** Eventos ejecutables configurados para la compañía de este expediente */
+  eventos: EventoCompania[];
+  /** Presencia actual (quién tiene el expediente abierto) */
+  presencia: ExpedientePresencia | null;
+  /** Asegurado con campos extendidos de comunicaciones */
+  asegurado: SeguimientoAseguradoComunicaciones;
+}
+
+// ── Requests nuevos ───────────────────────────────────────────────────────────
+
+export interface UpdatePendienteDeRequest {
+  pendiente_de: string | null;
+}
+
+export interface UpdateTiposCompaniaRequest {
+  /** IDs de tipos_compania activos para este expediente */
+  tipo_ids: string[];
+}
+
+export interface EjecutarEventoRequest {
+  expediente_id: string;
+  evento_id: string;
+}
+
+export interface EnviarSmsRequest {
+  telefono: string;
+  texto: string;
+  texto_predefinido_id?: string;
+}
+
+export interface EnviarEmailRequest {
+  email: string;
+  asunto: string;
+  cuerpo: string;
+  texto_predefinido_id?: string;
+}
+
+export interface EnviarPanelClienteRequest {
+  /** 'sms' | 'email' */
+  canal: 'sms' | 'email';
+  /** teléfono si canal=sms */
+  telefono?: string;
+  /** email si canal=email */
+  email?: string;
+}
+
+export interface UpdateComunicacionesAseguradoRequest {
+  asegurado_id: string;
+  consentimiento_com?: 'acepta' | 'rechaza';
+  consentimiento_tipo?: 'sms' | 'email' | 'ambos';
+  telefono?: string;
+  telefono_desc?: string;
+  telefono_movil?: boolean;
+  telefono_prioridad?: number;
+  telefono2?: string;
+  telefono2_desc?: string;
+  telefono2_movil?: boolean;
+  telefono3?: string;
+  telefono3_desc?: string;
+  telefono3_movil?: boolean;
+  email?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MÓDULO SEGUIMIENTO — BLOQUE 2 (Secciones 6-10)
+// ═══════════════════════════════════════════════════════════════
+
+// ── S8.4: Trabajos por expediente ─────────────────────────────────────────────
+
+export interface TrabajoExpediente {
+  id: string;
+  expediente_id: string;
+  operario_id: string | null;
+  operario_nombre: string | null;
+  especialidad: string | null;
+  descripcion: string;
+  estado: 'No iniciado' | 'Subsanado';
+  fecha_asignacion: string | null;
+  fecha_cita: string | null;
+  fecha_finalizacion: string | null;
+  orden: number;
+  created_at: string;
+}
+
+// ── S9: Comunicaciones ASITUR / INTERPWGS ─────────────────────────────────────
+
+export const TIPOS_MENSAJE_ASITUR = [
+  { value: 'INFOGENERALENVIAR',                label: 'INFO ENVIADO' },
+  { value: 'INFOGENERALRECIBIR',               label: 'INFO RECIBIDO' },
+  { value: 'Relato',                           label: 'Relato' },
+  { value: 'Peticion_intervencion_perito',     label: 'Petición intervención de perito' },
+  { value: 'Peticion_intervencion_proveedor',  label: 'Petición intervención de otro proveedor' },
+  { value: 'Solicitud_instrucciones_cobertura',label: 'Solicitud instrucciones de cobertura' },
+  { value: 'Recibidas_instrucciones_periciales', label: 'Recibidas instrucciones periciales' },
+  { value: 'Recibidas_instrucciones_asegurado',  label: 'Recibidas instrucciones asegurado' },
+  { value: 'Informacion_solicitada_ASITUR',    label: 'Información solicitada por ASITUR' },
+  { value: 'Solicitud_instrucciones_ASITUR',   label: 'Solicitud de instrucciones a ASITUR' },
+  { value: 'Enviar_presupuesto',               label: 'Enviar presupuesto/valoración de daños' },
+  { value: 'TERMINAR',                         label: 'TERMINAR' },
+] as const;
+
+export type TipoMensajeAsitur = (typeof TIPOS_MENSAJE_ASITUR)[number]['value'];
+
+export interface ComunicacionAsitur {
+  id: string;
+  expediente_id: string;
+  tipo_mensaje: TipoMensajeAsitur;
+  contenido: string;
+  adjunto_path: string | null;
+  adjunto_nombre: string | null;
+  direccion: 'entrante' | 'saliente';
+  actor_nombre: string;
+  leido: boolean;
+  created_at: string;
+}
+
+// ── S10: Notas internas ───────────────────────────────────────────────────────
+
+export interface NotaInterna {
+  id: string;
+  expediente_id: string;
+  tipo: 'tramitador' | 'operario';
+  texto: string;
+  autor_id: string | null;
+  autor_nombre: string;
+  alarma_fecha: string | null;
+  alarma_usuario_nombre: string | null;
+  alarma_tipo: string | null;
+  alarma_estado: 'Activada' | 'Desactivada';
+  realizado: boolean;
+  created_at: string;
+}
+
+// ── Extensión SeguimientoExpediente con datos Bloque 2 ────────────────────────
+
+export interface SeguimientoExpedienteB2 extends SeguimientoExpediente {
+  /** Estado operacional del tramitador (≠ FSM estado) — heredado B1 */
+  pendiente_de: string | null;
+  tipos_compania: TipoCompania[];
+  eventos: EventoCompania[];
+  presencia: ExpedientePresencia | null;
+  asegurado: SeguimientoAseguradoComunicaciones;
+  /** Trabajos por expediente con estados No iniciado / Subsanado (S8.4) */
+  trabajos: TrabajoExpediente[];
+  /** Notas de tramitadores (S10) */
+  notas_tramitador: NotaInterna[];
+  /** Notas de operarios (S10) */
+  notas_operario: NotaInterna[];
+  /** Comunicaciones ASITUR (S9) */
+  comunicaciones_asitur: ComunicacionAsitur[];
+}
+
+// ── Requests Bloque 2 ─────────────────────────────────────────────────────────
+
+export interface CreatePedidoExpedienteRequest {
+  /** expediente_id se pasa via URL en el endpoint, no en el body */
+  proveedor_id: string;
+  descripcion: string;
+  fecha_limite?: string | null;
+}
+
+export interface UpdatePedidoExpedienteRequest {
+  estado?: string;
+  fecha_limite?: string | null;
+}
+
+export interface CreateTrabajoRequest {
+  operario_id?: string | null;
+  operario_nombre?: string | null;
+  especialidad?: string | null;
+  descripcion: string;
+  fecha_asignacion?: string | null;
+  fecha_cita?: string | null;
+  orden?: number;
+}
+
+export interface UpdateTrabajoEstadoRequest {
+  estado: 'No iniciado' | 'Subsanado';
+}
+
+export interface CreateNotaRequest {
+  tipo: 'tramitador' | 'operario';
+  texto: string;
+  alarma_fecha?: string | null;
+  alarma_usuario_id?: string | null;
+  alarma_usuario_nombre?: string | null;
+  alarma_tipo?: string | null;
+}
+
+export interface EnviarMensajeAsiturRequest {
+  tipo_mensaje: TipoMensajeAsitur;
+  contenido: string;
+  /** File object para adjunto — manejado en el hook con FormData */
+  adjunto_nombre?: string | null;
+  adjunto_path?: string | null;
+}
+
+export interface MarcarNotaRealizadaRequest {
+  realizado: boolean;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MÓDULO SEGUIMIENTO — BLOQUE 3 (Secciones 11-15)
+// ═══════════════════════════════════════════════════════════════
+
+// ── S11: Catálogos de incidencias ─────────────────────────────────────────────
+
+export const TIPO_INCIDENCIA_OPTIONS = [
+  { value: 'Operario',   label: 'Incidencia operario' },
+  { value: 'Tramitador', label: 'Incidencia tramitador' },
+  { value: 'Compañía',   label: 'Incidencia recibida de compañía' },
+] as const;
+
+export const TIPOLOGIA_INCIDENCIA_OPTIONS = [
+  'Fotografías',
+  'Trabajos mal ejecutados',
+  'Comportamiento incorrecto',
+  'Retraso en ejecución',
+  'Retraso factura',
+  'Daños a terceros',
+  'Impagos a proveedores',
+  'Material incorrecto',
+  'Presupuesto',
+  'Quejas',
+  'Reclamación',
+  'Otros',
+] as const;
+
+export const PROC_INCIDENCIA_OPTIONS = [
+  { value: 'Procedente',    label: 'Procedente (Sí)' },
+  { value: 'No procedente', label: 'No procedente' },
+  { value: 'No procede',    label: 'No procede' },
+] as const;
+
+// ── S12: Encuesta ─────────────────────────────────────────────────────────────
+
+export const TIPO_ENCUESTA_OPTIONS = [
+  'Sigue tu expediente',
+  'Calidad del servicio',
+  'Atención al asegurado',
+  'Satisfacción global',
+] as const;
+
+export interface EnviarEncuestaRequest {
+  visita_id?: string | null;
+  tipo_encuesta: string;
+}
+
+// ── S13: Informe fotográfico — campos adicionales ─────────────────────────────
+
+export interface CamposAdicionalesExpediente {
+  id: string;
+  expediente_id: string;
+  campo_82: string | null;   // Material
+  campo_83: string | null;   // Marca / Modelo
+  campo_84: string | null;   // Medidas
+  campo_85: string | null;   // Entrada
+  campo_86: string | null;   // Salida
+  campo_87: string | null;   // Nombre quien recoge
+  campo_88: string | null;   // DNI / Fecha recogida
+  campo_89: string | null;   // Delegación
+  updated_at: string;
+}
+
+export interface UpsertCamposAdicionalesRequest {
+  campo_82?: string | null;
+  campo_83?: string | null;
+  campo_84?: string | null;
+  campo_85?: string | null;
+  campo_86?: string | null;
+  campo_87?: string | null;
+  campo_88?: string | null;
+  campo_89?: string | null;
+}
+
+// ── S14: Adjuntos y Email ─────────────────────────────────────────────────────
+
+export interface AdjuntoUploadInitRequest {
+  nombre_original: string;
+  mime_type: string;
+}
+
+export interface AdjuntoUploadInitResponse {
+  signed_url: string;
+  storage_path: string;
+}
+
+export interface RegistrarAdjuntoRequest {
+  tipo_documento: string;
+  descripcion?: string | null;
+  storage_path: string;
+  nombre_original?: string | null;
+  mime_type?: string | null;
+}
+
+export interface EnviarEmailAdjuntosRequest {
+  email_destino: string;
+  email_libre?: string | null;
+  asunto: string;
+  cuerpo: string;
+  adjunto_ids?: string[];
+}
+
+// ── S15: SMS programado ───────────────────────────────────────────────────────
+
+export interface EnviarSmsExpedienteRequest {
+  destinatario_nombre: string;
+  numero: string;
+  texto: string;
+  fecha_programada?: string | null;
+}
+
+export interface SmsProgramado {
+  id: string;
+  expediente_id: string;
+  destinatario_nombre: string;
+  numero: string;
+  texto: string;
+  fecha_programada: string | null;
+  estado: 'pendiente' | 'enviado' | 'fallido' | 'cancelado';
+  enviado_at: string | null;
+  created_at: string;
+}
+
+// ── S16: Email al operario ────────────────────────────────────────────────────
+
+export interface EnviarEmailOperarioRequest {
+  email_destino: string;
+  email_libre?: string | null;
+  nombre_destino?: string | null;
+  asunto?: string | null;
+  cuerpo: string;
+}
+
+export interface EmailExpedienteLog {
+  id: string;
+  expediente_id: string;
+  email_destino: string;
+  email_libre: string | null;
+  nombre_destino: string | null;
+  asunto: string | null;
+  cuerpo: string;
+  created_at: string;
+}
+
+// ── G1: Especialidades del siniestro ──────────────────────────────────────────
+
+export const ESPECIALIDADES_SINIESTRO = [
+  'Fontanería',
+  'Electricidad',
+  'Albañilería',
+  'Carpintería',
+  'Pintura',
+  'Cerrajería',
+  'Cristalería',
+  'Climatización',
+  'Jardinería',
+  'Electrodomésticos',
+  'Impermeabilización',
+  'Telecomunicaciones',
+  'Desatascos',
+  'Control de plagas',
+  'Mudanzas',
+  'Otros',
+] as const;
+
+// ── G2: Datos adicionales por visita ──────────────────────────────────────────
+
+export interface ActualizarCampoVisitaRequest {
+  campo_2: string | null;
+}
+
+// ── G3: Plantillas de documento / Generación desde S12 ───────────────────────
+
+export interface PlantillaDocumento {
+  id: string;
+  nombre: string;
+  seccion: string | null;
+  activa: boolean;
+}
+
+export interface GenerarDocumentoExpedienteRequest {
+  plantilla_id: string;
+  visita_id?: string | null;
+}
+
+// ── G4: Firma STE Email por visita ────────────────────────────────────────────
+
+export interface EnviarFirmaEmailVisitaRequest {
+  visita_id: string;
 }

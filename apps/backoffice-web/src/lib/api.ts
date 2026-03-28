@@ -14,14 +14,35 @@ async function getToken(): Promise<string> {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<ApiResult<T>> {
   const token = await getToken();
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...options.headers,
-    },
-  });
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        ...options.headers,
+      },
+    });
+  } catch (networkError) {
+    return {
+      data: null,
+      error: { code: 'NETWORK_ERROR', message: 'Sin conexión con el servidor. Comprueba tu red.' },
+    } as ApiResult<T>;
+  }
+
+  if (!res.ok && res.status >= 500) {
+    // Evitar parsear HTML que devuelve Cloudflare en errores de gateway
+    const contentType = res.headers.get('content-type') ?? '';
+    if (!contentType.includes('application/json')) {
+      return {
+        data: null,
+        error: { code: `HTTP_${res.status}`, message: `Error del servidor (${res.status}). Inténtalo de nuevo.` },
+      } as ApiResult<T>;
+    }
+  }
+
   return res.json();
 }
 
@@ -31,6 +52,8 @@ export const api = {
     request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
   put: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
+  patch: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
   del: <T>(path: string) =>
     request<T>(path, { method: 'DELETE' }),
 };

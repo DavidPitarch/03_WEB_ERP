@@ -1,334 +1,375 @@
 import { useState } from 'react';
-import { HardHat, Plus, Pencil, Search } from 'lucide-react';
-import { useOperarios, useCreateOperario, useUpdateOperario, useCatalogos } from '@/hooks/useMasters';
-import { useDocRequerida } from '@/hooks/useDocRequerida';
+import { useNavigate } from 'react-router-dom';
+import { HardHat, Plus, Pencil, Trash2, ChevronDown, ChevronRight, Search } from 'lucide-react';
+import {
+  useOperariosLista,
+  useDeleteOperario,
+  useOperarioEspecialidades,
+  useAddOperarioEspecialidad,
+  useUpdateOperarioEspecialidad,
+  useRemoveOperarioEspecialidad,
+  type OperariosFilters,
+} from '@/hooks/useOperarios';
+import { useEspecialidades } from '@/hooks/useEspecialidades';
 
-type ModalTab = 'datos' | 'doc' | 'servicios';
+const PER_PAGE = 10;
 
-const TIPOS_SERVICIO = [
-  'Fontanería', 'Electricidad', 'Carpintería', 'Cerrajería', 'Cristalería',
-  'Pintura', 'Albañilería', 'Climatización', 'Jardinería', 'Limpieza',
-  'Desbordamiento', 'Impermeabilización', 'Deshumectación', 'Caída de árbol', 'Otros',
-];
+// ─── Sub-vista inline de especialidades ──────────────────────────────────────
 
-const TIPO_ID = ['NIF', 'CIF', 'NIE', 'OTROS'];
+function EspecialidadesRow({ operarioId }: { operarioId: string }) {
+  const { data: espRes, isLoading } = useOperarioEspecialidades(operarioId);
+  const { data: catRes } = useEspecialidades(true);
+  const especialidades = espRes && 'data' in espRes ? ((espRes.data as unknown) as any[]) ?? [] : [];
+  const catalogo: any[] = catRes && 'data' in catRes ? (catRes.data as any[]) ?? [] : [];
 
-const EMPTY_FORM = {
-  nombre: '', apellidos: '', telefono: '', email: '',
-  nif: '', tipo_identificacion: 'NIF',
-  direccion: '', codigo_postal: '', ciudad: '', provincia: '',
-  iban: '', tipo_operario: 'autonomo' as 'autonomo' | 'contratado',
-  gremios: [] as string[], tipos_servicio: [] as string[],
-  activo: true, observaciones: '',
-};
+  const addMut    = useAddOperarioEspecialidad();
+  const updateMut = useUpdateOperarioEspecialidad();
+  const removeMut = useRemoveOperarioEspecialidad();
+
+  const [selectedEsp, setSelectedEsp] = useState('');
+
+  const asignadasIds = new Set(especialidades.map((e: any) => e.especialidad_id));
+  const disponibles  = catalogo.filter((c) => !asignadasIds.has(c.id));
+
+  async function handleAdd() {
+    if (!selectedEsp) return;
+    await addMut.mutateAsync({ operarioId, especialidadId: selectedEsp });
+    setSelectedEsp('');
+  }
+
+  return (
+    <tr>
+      <td colSpan={5} style={{ background: 'var(--color-bg-subtle)', padding: '12px 24px', borderBottom: '1px solid var(--color-border-default)' }}>
+        {isLoading ? (
+          <span style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>Cargando...</span>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Selector añadir */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <select
+                className="form-control"
+                style={{ width: 280, fontSize: 13 }}
+                value={selectedEsp}
+                onChange={(e) => setSelectedEsp(e.target.value)}
+              >
+                <option value="">Especialidades...</option>
+                {disponibles.map((e: any) => (
+                  <option key={e.id} value={e.id}>{e.nombre}</option>
+                ))}
+              </select>
+              <button
+                className="btn btn-primary"
+                style={{ fontSize: 13, padding: '4px 12px' }}
+                disabled={!selectedEsp || addMut.isPending}
+                onClick={handleAdd}
+              >
+                Añadir
+              </button>
+            </div>
+
+            {/* Lista de especialidades asignadas */}
+            {especialidades.length > 0 && (
+              <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                <tbody>
+                  {especialidades.map((rel: any) => (
+                    <tr key={rel.id} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
+                      <td style={{ padding: '6px 0', fontWeight: 500 }}>
+                        {rel.especialidades?.nombre ?? '—'}
+                      </td>
+                      <td style={{ padding: '6px 8px', width: 200 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                          <input
+                            type="checkbox"
+                            checked={rel.es_principal}
+                            onChange={(e) =>
+                              updateMut.mutate({ operarioId, espRelId: rel.id, esPrincipal: e.target.checked })
+                            }
+                            style={{ width: 13, height: 13 }}
+                          />
+                          Operario principal
+                        </label>
+                      </td>
+                      <td style={{ padding: '6px 0', textAlign: 'right' }}>
+                        <button
+                          className="btn btn-secondary"
+                          style={{ fontSize: 12, padding: '2px 8px', color: 'var(--color-danger)' }}
+                          onClick={() => removeMut.mutate({ operarioId, espRelId: rel.id })}
+                          disabled={removeMut.isPending}
+                        >
+                          Borrar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {especialidades.length === 0 && (
+              <span style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>Sin especialidades asignadas</span>
+            )}
+          </div>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+// ─── Página principal ─────────────────────────────────────────────────────────
 
 export function OperariosConfigPage() {
-  const { data: gremiosRes } = useCatalogos('gremio');
-  const gremios = gremiosRes && 'data' in gremiosRes ? (gremiosRes.data as any[]) ?? [] : [];
+  const navigate = useNavigate();
 
-  const { data: docRes } = useDocRequerida(true);
-  const docsRequeridos: any[] = docRes?.data ?? [];
-
-  const { data: res, isLoading } = useOperarios();
-  const createMut = useCreateOperario();
-  const updateMut = useUpdateOperario();
-
-  const [search, setSearch] = useState('');
-  const [filtroActivo, setFiltroActivo] = useState<'activos' | 'todos' | 'bajas'>('activos');
-  const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [tab, setTab] = useState<ModalTab>('datos');
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [formError, setFormError] = useState('');
-
-  const operarios: any[] = res && 'data' in res ? (res.data as any[]) ?? [] : [];
-  const filtered = operarios.filter((o: any) => {
-    const matchActivo = filtroActivo === 'activos' ? o.activo : filtroActivo === 'bajas' ? !o.activo : true;
-    const matchSearch = !search || `${o.nombre} ${o.apellidos} ${o.email}`.toLowerCase().includes(search.toLowerCase());
-    return matchActivo && matchSearch;
+  const [filters, setFilters] = useState<OperariosFilters>({
+    estado: 'activos',
+    page: 1,
+    per_page: PER_PAGE,
   });
+  const [searchInput, setSearchInput]   = useState('');
+  const [cpInput, setCpInput]           = useState('');
+  const [espInput, setEspInput]         = useState('');
+  const [expandedId, setExpandedId]     = useState<string | null>(null);
 
-  function openNew() {
-    setEditId(null); setForm(EMPTY_FORM); setFormError(''); setTab('datos'); setShowForm(true);
-  }
-  function openEdit(o: any) {
-    setEditId(o.id);
-    setForm({
-      nombre: o.nombre ?? '', apellidos: o.apellidos ?? '', telefono: o.telefono ?? '', email: o.email ?? '',
-      nif: o.nif ?? '', tipo_identificacion: o.tipo_identificacion ?? 'NIF',
-      direccion: o.direccion ?? '', codigo_postal: o.codigo_postal ?? '', ciudad: o.ciudad ?? '', provincia: o.provincia ?? '',
-      iban: o.iban ?? '', tipo_operario: o.tipo_operario ?? 'autonomo',
-      gremios: o.gremios ?? [], tipos_servicio: o.tipos_servicio ?? [],
-      activo: o.activo ?? true, observaciones: o.observaciones ?? '',
-    });
-    setFormError(''); setTab('datos'); setShowForm(true);
-  }
+  const { data: res, isLoading } = useOperariosLista(filters);
+  const { data: catRes }         = useEspecialidades(true);
+  const deleteMut                = useDeleteOperario();
 
-  function setField(k: string, v: unknown) { setForm(p => ({ ...p, [k]: v })); }
+  const result    = res && 'data' in res ? res.data as any : null;
+  const items     = result?.items ?? [];
+  const total     = result?.total ?? 0;
+  const totalPages = result?.total_pages ?? 0;
+  const catalogo: any[] = catRes && 'data' in catRes ? (catRes.data as any[]) ?? [] : [];
 
-  function toggleArr(k: 'gremios' | 'tipos_servicio', val: string) {
-    setForm(p => ({ ...p, [k]: p[k].includes(val) ? p[k].filter((x: string) => x !== val) : [...p[k], val] }));
-  }
-
-  async function handleSave() {
-    setFormError('');
-    try {
-      if (editId) await updateMut.mutateAsync({ id: editId, ...form } as any);
-      else await createMut.mutateAsync(form as any);
-      setShowForm(false);
-    } catch (err: any) { setFormError(err.message ?? 'Error al guardar'); }
+  function applyFilters() {
+    setFilters((f) => ({
+      ...f,
+      search: searchInput || undefined,
+      cp: cpInput || undefined,
+      especialidad_id: espInput || undefined,
+      page: 1,
+    }));
   }
 
-  const isPending = createMut.isPending || updateMut.isPending;
+  function setPage(page: number) {
+    setFilters((f) => ({ ...f, page }));
+  }
+
+  function setEstado(estado: 'activos' | 'eliminados') {
+    setFilters((f) => ({ ...f, estado, page: 1 }));
+  }
+
+  function toggleExpand(id: string) {
+    setExpandedId((prev) => (prev === id ? null : id));
+  }
+
+  async function handleDelete(id: string, nombre: string) {
+    if (!window.confirm(`¿Dar de baja al operario "${nombre}"?`)) return;
+    await deleteMut.mutateAsync(id);
+  }
+
+  // Paginación: renderiza botones
+  function renderPagination() {
+    if (totalPages <= 1) return null;
+    const buttons = [];
+    for (let p = 1; p <= totalPages; p++) {
+      buttons.push(
+        <button
+          key={p}
+          className={`btn ${filters.page === p ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ minWidth: 32, padding: '3px 8px', fontSize: 12 }}
+          onClick={() => setPage(p)}
+        >
+          {p}
+        </button>
+      );
+    }
+    if (totalPages > 1) {
+      buttons.push(
+        <button
+          key="end"
+          className="btn btn-secondary"
+          style={{ minWidth: 32, padding: '3px 8px', fontSize: 12 }}
+          onClick={() => setPage(totalPages)}
+        >
+          {'>>'}
+        </button>
+      );
+    }
+    return (
+      <div style={{ marginTop: 12 }}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
+          {buttons}
+        </div>
+        <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+          Página {filters.page} de {totalPages} — {total} operario{total !== 1 ? 's' : ''}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="page-stub">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+      {/* Cabecera */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
-          <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}><HardHat size={20} /> Operarios</h2>
-          <p className="text-muted" style={{ margin: '4px 0 0' }}>Gestión de operarios, especialidades y documentación requerida</p>
+          <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <HardHat size={20} /> Listado de Operarios
+          </h2>
+          <p className="text-muted" style={{ margin: '4px 0 0', fontSize: 13 }}>
+            {total} operario{total !== 1 ? 's' : ''} · Gestión de especialidades y configuración
+          </p>
         </div>
-        <button className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={openNew}>
-          <Plus size={15} /> Nuevo operario
+        <button
+          className="btn btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          onClick={() => navigate('/operarios-config/nuevo')}
+        >
+          <Plus size={15} /> Añadir Operario
         </button>
       </div>
 
-      {/* Filtros */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        {(['activos', 'todos', 'bajas'] as const).map((f) => (
-          <button key={f} className={`btn ${filtroActivo === f ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFiltroActivo(f)}>
-            {f === 'activos' ? 'Activos' : f === 'bajas' ? 'Bajas' : 'Todos'}
-          </button>
-        ))}
-        <div style={{ position: 'relative', marginLeft: 'auto' }}>
-          <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} />
-          <input className="form-control" style={{ paddingLeft: 32, width: 220 }} placeholder="Buscar operario..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      {/* Barra de filtros */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'flex-end', background: 'var(--color-bg-subtle)', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--color-border-default)' }}>
+        <div style={{ position: 'relative' }}>
+          <Search size={13} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} />
+          <input
+            className="form-control"
+            style={{ paddingLeft: 28, width: 200, fontSize: 13 }}
+            placeholder="Buscar por nombre..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+          />
         </div>
-        <span style={{ color: 'var(--color-text-tertiary)', fontSize: 13 }}>{filtered.length} operario{filtered.length !== 1 ? 's' : ''}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <label style={{ fontSize: 13, whiteSpace: 'nowrap' }}>CP:</label>
+          <input
+            className="form-control"
+            type="number"
+            style={{ width: 90, fontSize: 13 }}
+            placeholder="00000"
+            value={cpInput}
+            onChange={(e) => setCpInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+          />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <label style={{ fontSize: 13, whiteSpace: 'nowrap' }}>Especialidad:</label>
+          <select
+            className="form-control"
+            style={{ width: 200, fontSize: 13 }}
+            value={espInput}
+            onChange={(e) => setEspInput(e.target.value)}
+          >
+            <option value="">Todas</option>
+            {catalogo.map((e: any) => (
+              <option key={e.id} value={e.id}>{e.nombre}</option>
+            ))}
+          </select>
+        </div>
+        <button className="btn btn-primary" style={{ fontSize: 13 }} onClick={applyFilters}>
+          Buscar
+        </button>
+        <select
+          className="form-control"
+          style={{ width: 130, fontSize: 13 }}
+          value={filters.estado ?? 'activos'}
+          onChange={(e) => setEstado(e.target.value as 'activos' | 'eliminados')}
+        >
+          <option value="activos">Activos</option>
+          <option value="eliminados">Eliminados</option>
+        </select>
       </div>
 
-      {isLoading ? <div className="loading">Cargando operarios...</div> : (
+      {/* Tabla */}
+      {isLoading ? (
+        <div className="loading">Cargando operarios...</div>
+      ) : (
         <div className="table-wrapper">
-          <table className="data-table">
+          <table className="data-table" style={{ width: '100%' }}>
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>Teléfono</th>
-                <th>Email</th>
-                <th>Tipo</th>
+                <th style={{ background: '#000', color: '#fff' }} colSpan={5}>Listado de Operarios</th>
+              </tr>
+              <tr>
+                <th>Operario</th>
                 <th>Especialidades</th>
-                <th style={{ textAlign: 'center' }}>Estado</th>
-                <th style={{ textAlign: 'center' }}>Acciones</th>
+                <th>Editar</th>
+                <th>Borrar</th>
+                <th style={{ width: 32 }}></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 && (
-                <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--color-text-tertiary)', padding: '32px 0' }}>Sin operarios</td></tr>
-              )}
-              {filtered.map((o: any) => (
-                <tr key={o.id} style={{ opacity: o.activo ? 1 : 0.55 }}>
-                  <td style={{ fontWeight: 600 }}>{o.nombre} {o.apellidos}</td>
-                  <td style={{ fontSize: 13 }}>{o.telefono ?? '—'}</td>
-                  <td style={{ fontSize: 13 }}>{o.email || '—'}</td>
-                  <td style={{ fontSize: 12 }}>
-                    <span className="badge badge-default">{o.tipo_operario === 'contratado' ? 'Contratado' : 'Autónomo'}</span>
-                  </td>
-                  <td style={{ fontSize: 12 }}>{(o.gremios || []).slice(0, 3).join(', ') || '—'}{(o.gremios || []).length > 3 && '...'}</td>
-                  <td style={{ textAlign: 'center' }}>
-                    <span className={`badge ${o.activo ? 'badge-success' : 'badge-default'}`}>{o.activo ? 'Activo' : 'Baja'}</span>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                      <button className="btn btn-secondary" style={{ padding: '4px 8px' }} onClick={() => openEdit(o)} title="Editar"><Pencil size={13} /></button>
-                    </div>
+              {items.length === 0 && (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--color-text-tertiary)', padding: '32px 0' }}>
+                    Sin operarios
                   </td>
                 </tr>
+              )}
+              {items.map((o: any) => (
+                <>
+                  <tr
+                    key={o.id}
+                    style={{ opacity: o.activo ? 1 : 0.55, background: expandedId === o.id ? 'var(--color-bg-subtle)' : undefined }}
+                  >
+                    <td>
+                      <button
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: 0, color: 'var(--color-primary)', fontWeight: 600, fontSize: 14 }}
+                        onClick={() => toggleExpand(o.id)}
+                      >
+                        {expandedId === o.id ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        <span style={{ color: o.activo ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 700 }}>
+                          ({o.activo ? 'A' : 'N'})
+                        </span>
+                        {o.nombre} {o.apellidos}
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ fontSize: 12, padding: '2px 8px' }}
+                        onClick={() => toggleExpand(o.id)}
+                      >
+                        Especialidades
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ fontSize: 12, padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 4 }}
+                        onClick={() => navigate(`/operarios-config/${o.id}`)}
+                      >
+                        <Pencil size={12} /> Editar
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ fontSize: 12, padding: '2px 8px', color: 'var(--color-danger)', display: 'flex', alignItems: 'center', gap: 4 }}
+                        onClick={() => handleDelete(o.id, `${o.nombre} ${o.apellidos}`)}
+                        disabled={deleteMut.isPending}
+                      >
+                        <Trash2 size={12} /> Borrar
+                      </button>
+                    </td>
+                    <td style={{ textAlign: 'center', fontSize: 16 }}>
+                      {o.bloqueado && (
+                        <span title="Bloqueado" style={{ color: 'var(--color-danger)', fontWeight: 700, fontSize: 18 }}>⊘</span>
+                      )}
+                    </td>
+                  </tr>
+                  {expandedId === o.id && (
+                    <EspecialidadesRow key={`esp-${o.id}`} operarioId={o.id} />
+                  )}
+                </>
               ))}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* Modal: Crear / Editar */}
-      {showForm && (
-        <div className="modal-overlay-v2" onClick={() => setShowForm(false)}>
-          <div className="modal-v2 modal-v2--lg" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 680 }}>
-            <div className="modal-v2__header">
-              <div className="modal-v2__title">{editId ? 'Editar operario' : 'Nuevo operario'}</div>
-              <button className="modal-v2__close" onClick={() => setShowForm(false)} aria-label="Cerrar">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
-              </button>
-            </div>
-
-            {/* Tabs */}
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border-default)', padding: '0 24px' }}>
-              {([['datos', 'Datos'], ['doc', 'Doc. Requerida'], ['servicios', 'Tipos de Servicio']] as const).map(([key, label]) => (
-                <button key={key} onClick={() => setTab(key)} style={{
-                  padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500,
-                  borderBottom: tab === key ? '2px solid var(--color-primary)' : '2px solid transparent',
-                  color: tab === key ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                  marginBottom: -1,
-                }}>{label}</button>
-              ))}
-            </div>
-
-            <div className="modal-v2__body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              {formError && <div className="alert alert-error">{formError}</div>}
-
-              {/* Tab: Datos */}
-              {tab === 'datos' && (
-                <>
-                  <div className="form-section-v2">
-                    <div className="form-section-v2__title">Datos personales</div>
-                    <div className="form-grid-v2">
-                      <div className="form-group-v2">
-                        <label className="form-label required">Nombre</label>
-                        <input className="form-control" value={form.nombre} required autoFocus onChange={(e) => setField('nombre', e.target.value)} />
-                      </div>
-                      <div className="form-group-v2">
-                        <label className="form-label required">Apellidos</label>
-                        <input className="form-control" value={form.apellidos} required onChange={(e) => setField('apellidos', e.target.value)} />
-                      </div>
-                      <div className="form-group-v2">
-                        <label className="form-label">Identificación</label>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <select className="form-control" style={{ width: 80, flexShrink: 0 }} value={form.tipo_identificacion} onChange={(e) => setField('tipo_identificacion', e.target.value)}>
-                            {TIPO_ID.map(t => <option key={t}>{t}</option>)}
-                          </select>
-                          <input className="form-control" value={form.nif} placeholder="Número" onChange={(e) => setField('nif', e.target.value)} />
-                        </div>
-                      </div>
-                      <div className="form-group-v2">
-                        <label className="form-label">Tipo</label>
-                        <select className="form-control" value={form.tipo_operario} onChange={(e) => setField('tipo_operario', e.target.value)}>
-                          <option value="autonomo">Autónomo</option>
-                          <option value="contratado">Contratado</option>
-                        </select>
-                      </div>
-                      <div className="form-group-v2">
-                        <label className="form-label required">Teléfono</label>
-                        <input className="form-control" value={form.telefono} required onChange={(e) => setField('telefono', e.target.value)} />
-                      </div>
-                      <div className="form-group-v2">
-                        <label className="form-label">Email</label>
-                        <input className="form-control" type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="form-section-v2">
-                    <div className="form-section-v2__title">Dirección</div>
-                    <div className="form-grid-v2">
-                      <div className="form-group-v2 span-full">
-                        <label className="form-label">Dirección</label>
-                        <input className="form-control" value={form.direccion} onChange={(e) => setField('direccion', e.target.value)} />
-                      </div>
-                      <div className="form-group-v2">
-                        <label className="form-label">C.P.</label>
-                        <input className="form-control" value={form.codigo_postal} onChange={(e) => setField('codigo_postal', e.target.value)} />
-                      </div>
-                      <div className="form-group-v2">
-                        <label className="form-label">Ciudad</label>
-                        <input className="form-control" value={form.ciudad} onChange={(e) => setField('ciudad', e.target.value)} />
-                      </div>
-                      <div className="form-group-v2">
-                        <label className="form-label">Provincia</label>
-                        <input className="form-control" value={form.provincia} onChange={(e) => setField('provincia', e.target.value)} />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="form-section-v2">
-                    <div className="form-section-v2__title">Datos bancarios</div>
-                    <div className="form-group-v2">
-                      <label className="form-label">IBAN</label>
-                      <input className="form-control" value={form.iban} placeholder="ES00 0000 0000 0000 0000 0000" style={{ fontFamily: 'monospace' }}
-                        onChange={(e) => setField('iban', e.target.value.toUpperCase())} />
-                    </div>
-                  </div>
-                  <div className="form-group-v2">
-                    <label className="form-label">Observaciones</label>
-                    <textarea className="form-control" rows={3} value={form.observaciones} onChange={(e) => setField('observaciones', e.target.value)} />
-                  </div>
-                  {editId && (
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                      <input type="checkbox" checked={form.activo} onChange={(e) => setField('activo', e.target.checked)} style={{ width: 15, height: 15 }} />
-                      <span className="form-label" style={{ margin: 0 }}>Operario activo</span>
-                    </label>
-                  )}
-                  <div className="form-group-v2">
-                    <label className="form-label">Especialidades (Gremios)</label>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {gremios.map((g: any) => (
-                        <button key={g.codigo} type="button"
-                          className={`btn ${form.gremios.includes(g.codigo) ? 'btn-primary' : 'btn-secondary'}`}
-                          style={{ fontSize: 12, padding: '3px 10px' }}
-                          onClick={() => toggleArr('gremios', g.codigo)}>
-                          {g.valor}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Tab: Doc Requerida */}
-              {tab === 'doc' && (
-                <div>
-                  {docsRequeridos.length === 0 ? (
-                    <p style={{ textAlign: 'center', color: 'var(--color-text-tertiary)', padding: '24px 0' }}>
-                      No hay tipos de documentos configurados. Configúralos en <strong>Doc. Requerida</strong>.
-                    </p>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {docsRequeridos.map((d: any) => (
-                        <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--color-bg-subtle)', borderRadius: 8, border: '1px solid var(--color-border-default)' }}>
-                          <div>
-                            <div style={{ fontWeight: 500, fontSize: 14 }}>{d.nombre}</div>
-                            {d.dias_vigencia && <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>Vigencia: {d.dias_vigencia} días</div>}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            {d.obligatorio && <span className="badge badge-danger">Obligatorio</span>}
-                            <span className="badge badge-default">Sin entregar</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 16 }}>
-                    La gestión de los documentos entregados por el operario se realizará desde el perfil individual.
-                  </p>
-                </div>
-              )}
-
-              {/* Tab: Tipos de Servicio */}
-              {tab === 'servicios' && (
-                <div>
-                  <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 16 }}>
-                    Selecciona los tipos de servicio que puede realizar este operario:
-                  </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
-                    {TIPOS_SERVICIO.map((tipo) => (
-                      <label key={tipo} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '8px 12px', background: 'var(--color-bg-subtle)', borderRadius: 6, border: `1px solid ${form.tipos_servicio.includes(tipo) ? 'var(--color-primary)' : 'var(--color-border-default)'}` }}>
-                        <input type="checkbox" checked={form.tipos_servicio.includes(tipo)} onChange={() => toggleArr('tipos_servicio', tipo)} style={{ width: 15, height: 15 }} />
-                        <span style={{ fontSize: 13 }}>{tipo}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 12 }}>
-                    {form.tipos_servicio.length} tipo{form.tipos_servicio.length !== 1 ? 's' : ''} seleccionado{form.tipos_servicio.length !== 1 ? 's' : ''}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="modal-v2__footer">
-              <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancelar</button>
-              <button type="button" className="btn btn-primary" onClick={handleSave} disabled={isPending}>
-                {isPending ? 'Guardando...' : (editId ? 'Guardar cambios' : 'Crear operario')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Paginación */}
+      {renderPagination()}
     </div>
   );
 }

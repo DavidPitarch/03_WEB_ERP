@@ -1,7 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
+import { insertDomainEvent } from './services/audit';
 import { processGeocodingQueue } from './services/geocoding';
 import { checkWorkloadAlerts } from './services/workload-alerts';
 import type { Env } from './types';
+
+const SYSTEM_ACTOR_ID = '00000000-0000-0000-0000-000000000000';
 
 export async function runScheduledTasks(env: Env): Promise<Record<string, any>> {
   const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
@@ -14,13 +17,21 @@ export async function runScheduledTasks(env: Env): Promise<Record<string, any>> 
     results.alertas = await generateAlertsManual(supabase);
   }
 
-  results.pedidos_caducados = await detectPedidosCaducados(supabase);
-  results.facturas_vencidas = await detectFacturasVencidas(supabase);
-  results.informes_caducados = await detectInformesCaducados(supabase);
-  results.geocoding_queue   = await processGeocodingQueue(supabase, 15);
-  results.geo_overload      = await detectGeoOverloads(supabase);
-  results.workload_alerts   = await checkWorkloadAlerts(supabase);
-  results.autocita_expirados = await detectAutocitaTokensExpirados(supabase);
+  results.pedidos_caducados        = await detectPedidosCaducados(supabase);
+  results.facturas_vencidas        = await detectFacturasVencidas(supabase);
+  results.informes_caducados       = await detectInformesCaducados(supabase);
+  results.geocoding_queue          = await processGeocodingQueue(supabase, 15);
+  results.geo_overload             = await detectGeoOverloads(supabase);
+  results.workload_alerts          = await checkWorkloadAlerts(supabase);
+  results.autocita_expirados       = await detectAutocitaTokensExpirados(supabase);
+  // ─── Watchdogs nuevos ────────────────────────────────────────
+  results.citas_sin_parte          = await detectCitasSinParte(supabase);         // W01
+  results.finalizados_sin_factura  = await detectFinalizadosSinFactura(supabase); // W02
+  results.tareas_escaladas         = await escalarTareasVencidas(supabase);        // W05
+  results.pendientes_atascados     = await detectPendientesAtascados(supabase);    // W06
+  results.nuevos_sin_contacto      = await detectNuevosSinContacto(supabase);      // W07
+  results.eventos_dead_letter      = await detectEventosDeadLetter(supabase);      // W08
+  results.partes_antiguas          = await detectPartesAntiguas(supabase);         // W09
 
   return results;
 }
@@ -236,4 +247,325 @@ async function detectAutocitaTokensExpirados(supabase: any) {
   }
 
   return { expirados_sin_accion: count };
+}
+
+// ─── W01: Citas realizadas >2h sin parte ─────────────────────────────────────
+async function detectCitasSinParte(supabase: any) {
+  const twoHoursAgo = new Date(Date.now() - 2 * 3_600_000).toISOString();
+
+  const { data: citas } = await supabase
+    .from('citas')
+    .select('id, expediente_id, expedientes(tramitador_id, numero_expediente)')
+    .eq('estado', 'realizada')
+    .lt('updated_at', twoHoursAgo);
+
+  let count = 0;
+  for (const c of citas ?? []) {
+    const { count: parteCount } = await supabase
+      .from('partes_operario')
+      .select('id', { count: 'exact', head: true })
+      .eq('cita_id', c.id);
+
+    if (parteCount && parteCount > 0) continue;
+
+    const titulo = '[W01] Parte de trabajo pendiente tras visita';
+    const { count: tareaCount } = await supabase
+      .from('tareas_internas')
+      .select('id', { count: 'exact', head: true })
+      .eq('expediente_id', c.expediente_id)
+      .eq('titulo', titulo)
+      .in('estado', ['pendiente', 'en_progreso']);
+
+    if (tareaCount && tareaCount > 0) continue;
+
+    const tramitadorId = c.expedientes?.tramitador_id ?? null;
+
+    await supabase.from('tareas_internas').insert({
+      expediente_id: c.expediente_id,
+      titulo,
+      descripcion: `Cita ${c.id} marcada como realizada hace más de 2 horas sin parte adjunto.`,
+      asignado_a: tramitadorId,
+      creado_por: SYSTEM_ACTOR_ID,
+      prioridad: 'urgente',
+      estado: 'pendiente',
+    });
+
+    await supabase.from('alertas').upsert({
+      tipo: 'cita_sin_parte',
+      titulo: `Visita sin parte: ${c.expedientes?.numero_expediente ?? c.expediente_id}`,
+      expediente_id: c.expediente_id,
+      prioridad: 'alta',
+      estado: 'activa',
+      destinatario_id: tramitadorId,
+    }, { onConflict: 'tipo,expediente_id' });
+
+    count++;
+  }
+
+  return { sin_parte: count };
+}
+
+// ─── W02: Expedientes FINALIZADO >24h sin factura ────────────────────────────
+async function detectFinalizadosSinFactura(supabase: any) {
+  const oneDayAgo = new Date(Date.now() - 24 * 3_600_000).toISOString();
+
+  const { data: expedientes } = await supabase
+    .from('expedientes')
+    .select('id, numero_expediente, tramitador_id')
+    .eq('estado', 'FINALIZADO')
+    .lt('updated_at', oneDayAgo);
+
+  let count = 0;
+  for (const exp of expedientes ?? []) {
+    const { count: facturaCount } = await supabase
+      .from('facturas')
+      .select('id', { count: 'exact', head: true })
+      .eq('expediente_id', exp.id)
+      .not('estado', 'eq', 'anulada');
+
+    if (facturaCount && facturaCount > 0) continue;
+
+    const titulo = '[W02] Expediente finalizado sin factura emitida';
+    const { count: tareaCount } = await supabase
+      .from('tareas_internas')
+      .select('id', { count: 'exact', head: true })
+      .eq('expediente_id', exp.id)
+      .eq('titulo', titulo)
+      .in('estado', ['pendiente', 'en_progreso']);
+
+    if (tareaCount && tareaCount > 0) continue;
+
+    await supabase.from('tareas_internas').insert({
+      expediente_id: exp.id,
+      titulo,
+      descripcion: `El expediente ${exp.numero_expediente} lleva más de 24 h en estado FINALIZADO sin factura emitida.`,
+      asignado_a: null,
+      creado_por: SYSTEM_ACTOR_ID,
+      prioridad: 'alta',
+      estado: 'pendiente',
+    });
+
+    await supabase.from('alertas').upsert({
+      tipo: 'finalizado_sin_factura',
+      titulo: `Sin factura >24 h: ${exp.numero_expediente}`,
+      expediente_id: exp.id,
+      prioridad: 'alta',
+      estado: 'activa',
+    }, { onConflict: 'tipo,expediente_id' });
+
+    await insertDomainEvent(supabase, {
+      aggregate_id: exp.id,
+      aggregate_type: 'expediente',
+      event_type: 'TareaDisparada',
+      payload: { watchdog: 'W02', motivo: 'FINALIZADO >24h sin factura' },
+      actor_id: SYSTEM_ACTOR_ID,
+    });
+
+    count++;
+  }
+
+  return { sin_factura: count };
+}
+
+// ─── W05: Tareas pendientes > fecha_limite → escalar a supervisor ─────────────
+async function escalarTareasVencidas(supabase: any) {
+  const now = new Date().toISOString();
+
+  const { data: tareas } = await supabase
+    .from('tareas_internas')
+    .select('id, expediente_id, titulo')
+    .in('estado', ['pendiente', 'en_progreso'])
+    .lt('fecha_limite', now)
+    .not('fecha_limite', 'is', null);
+
+  let count = 0;
+  for (const t of tareas ?? []) {
+    const { count: alertaCount } = await supabase
+      .from('alertas')
+      .select('id', { count: 'exact', head: true })
+      .eq('tipo', 'tarea_escalada_supervisor')
+      .eq('tarea_id', t.id);
+
+    if (alertaCount && alertaCount > 0) continue;
+
+    await supabase.from('alertas').insert({
+      tipo: 'tarea_escalada_supervisor',
+      titulo: `[Escalada] Tarea vencida sin resolver: ${t.titulo}`,
+      expediente_id: t.expediente_id,
+      tarea_id: t.id,
+      prioridad: 'alta',
+      estado: 'activa',
+      destinatario_id: null,
+    });
+
+    count++;
+  }
+
+  return { escaladas: count };
+}
+
+// ─── W06: Expedientes PENDIENTE_* >48h sin cambio ────────────────────────────
+async function detectPendientesAtascados(supabase: any) {
+  const fortyEightHoursAgo = new Date(Date.now() - 48 * 3_600_000).toISOString();
+
+  const { data: expedientes } = await supabase
+    .from('expedientes')
+    .select('id, numero_expediente, estado, tramitador_id')
+    .in('estado', ['PENDIENTE', 'PENDIENTE_MATERIAL', 'PENDIENTE_PERITO', 'PENDIENTE_CLIENTE'])
+    .lt('updated_at', fortyEightHoursAgo);
+
+  let count = 0;
+  for (const exp of expedientes ?? []) {
+    const titulo = '[W06] Expediente bloqueado >48h sin cambio';
+    const { count: tareaCount } = await supabase
+      .from('tareas_internas')
+      .select('id', { count: 'exact', head: true })
+      .eq('expediente_id', exp.id)
+      .eq('titulo', titulo)
+      .in('estado', ['pendiente', 'en_progreso']);
+
+    if (tareaCount && tareaCount > 0) continue;
+
+    await supabase.from('tareas_internas').insert({
+      expediente_id: exp.id,
+      titulo,
+      descripcion: `El expediente ${exp.numero_expediente} lleva más de 48 h en estado ${exp.estado} sin cambios. Requiere revisión de supervisor.`,
+      asignado_a: null,
+      creado_por: SYSTEM_ACTOR_ID,
+      prioridad: 'urgente',
+      estado: 'pendiente',
+    });
+
+    await supabase.from('alertas').upsert({
+      tipo: 'pendiente_atascado',
+      titulo: `Bloqueado >48 h: ${exp.numero_expediente} (${exp.estado})`,
+      expediente_id: exp.id,
+      prioridad: 'urgente',
+      estado: 'activa',
+    }, { onConflict: 'tipo,expediente_id' });
+
+    await insertDomainEvent(supabase, {
+      aggregate_id: exp.id,
+      aggregate_type: 'expediente',
+      event_type: 'TareaDisparada',
+      payload: { watchdog: 'W06', estado: exp.estado, motivo: 'PENDIENTE_* >48h sin cambio' },
+      actor_id: SYSTEM_ACTOR_ID,
+    });
+
+    count++;
+  }
+
+  return { atascados: count };
+}
+
+// ─── W07: Expedientes NUEVO con SLA vencido sin asignar ──────────────────────
+async function detectNuevosSinContacto(supabase: any) {
+  const now = new Date().toISOString();
+
+  const { data: expedientes } = await supabase
+    .from('expedientes')
+    .select('id, numero_expediente, tramitador_id')
+    .eq('estado', 'NUEVO')
+    .lt('fecha_limite_sla', now)
+    .not('fecha_limite_sla', 'is', null);
+
+  let count = 0;
+  for (const exp of expedientes ?? []) {
+    await supabase.from('alertas').upsert({
+      tipo: 'nuevo_sla_vencido',
+      titulo: `SLA vencido sin asignar: ${exp.numero_expediente}`,
+      expediente_id: exp.id,
+      prioridad: 'urgente',
+      estado: 'activa',
+      destinatario_id: exp.tramitador_id ?? null,
+    }, { onConflict: 'tipo,expediente_id' });
+
+    count++;
+  }
+
+  return { sla_vencidos: count };
+}
+
+// ─── W08: eventos_dominio con retry >= 3 (dead letter) ───────────────────────
+async function detectEventosDeadLetter(supabase: any) {
+  const { data: eventos } = await supabase
+    .from('eventos_dominio')
+    .select('id, event_type, aggregate_id, error, retry_count')
+    .eq('processed', false)
+    .gte('retry_count', 3);
+
+  let count = 0;
+  for (const ev of eventos ?? []) {
+    // Check if alerta already exists for this event
+    const { count: alertaCount } = await supabase
+      .from('alertas')
+      .select('id', { count: 'exact', head: true })
+      .eq('tipo', 'evento_dead_letter')
+      .eq('expediente_id', ev.aggregate_id);
+
+    if (alertaCount && alertaCount > 0) continue;
+
+    await supabase.from('alertas').insert({
+      tipo: 'evento_dead_letter',
+      titulo: `[DLQ] ${ev.event_type} — ${ev.retry_count} reintentos fallidos`,
+      mensaje: ev.error ?? 'Sin detalle de error registrado',
+      expediente_id: ev.aggregate_id ?? null,
+      prioridad: 'alta',
+      estado: 'activa',
+      destinatario_id: null,
+    });
+
+    count++;
+  }
+
+  return { dead_letters: count };
+}
+
+// ─── W09: Partes pendientes de validación >48h ───────────────────────────────
+async function detectPartesAntiguas(supabase: any) {
+  const fortyEightHoursAgo = new Date(Date.now() - 48 * 3_600_000).toISOString();
+
+  const { data: partes } = await supabase
+    .from('partes_operario')
+    .select('id, expediente_id, expedientes(tramitador_id, numero_expediente)')
+    .eq('validado', false)
+    .lt('created_at', fortyEightHoursAgo);
+
+  let count = 0;
+  for (const p of partes ?? []) {
+    const titulo = '[W09] Parte sin validar >48h';
+    const { count: tareaCount } = await supabase
+      .from('tareas_internas')
+      .select('id', { count: 'exact', head: true })
+      .eq('expediente_id', p.expediente_id)
+      .eq('titulo', titulo)
+      .in('estado', ['pendiente', 'en_progreso']);
+
+    if (tareaCount && tareaCount > 0) continue;
+
+    const tramitadorId = p.expedientes?.tramitador_id ?? null;
+
+    await supabase.from('tareas_internas').insert({
+      expediente_id: p.expediente_id,
+      titulo,
+      descripcion: `El parte ${p.id} del expediente ${p.expedientes?.numero_expediente ?? p.expediente_id} lleva más de 48 h pendiente de validación.`,
+      asignado_a: tramitadorId,
+      creado_por: SYSTEM_ACTOR_ID,
+      prioridad: 'media',
+      estado: 'pendiente',
+    });
+
+    await supabase.from('alertas').upsert({
+      tipo: 'parte_sin_validar',
+      titulo: `Parte sin validar >48h: ${p.expedientes?.numero_expediente ?? p.expediente_id}`,
+      expediente_id: p.expediente_id,
+      prioridad: 'media',
+      estado: 'activa',
+      destinatario_id: tramitadorId,
+    }, { onConflict: 'tipo,expediente_id' });
+
+    count++;
+  }
+
+  return { partes_antiguas: count };
 }

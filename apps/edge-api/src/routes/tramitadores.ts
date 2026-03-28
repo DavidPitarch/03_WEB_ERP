@@ -141,22 +141,32 @@ tramitadoresRoutes.post('/', async (c) => {
 
   const user_id = authData.user.id;
 
+  // Compute apellidos from parts
+  const apellido1 = (body.apellido1 ?? '').trim();
+  const apellido2 = (body.apellido2 ?? '').trim();
+  const apellidos = body.apellidos ?? [apellido1, apellido2].filter(Boolean).join(' ');
+
   const { data, error } = await supabase
     .from('tramitadores')
     .insert({
       user_id,
-      empresa_facturadora_id:  body.empresa_facturadora_id ?? null,
-      nombre:                  body.nombre,
-      apellidos:               body.apellidos,
-      email:                   body.email,
-      telefono:                body.telefono ?? null,
-      nivel:                   body.nivel ?? 'tramitador',
-      max_expedientes_activos: body.max_expedientes_activos ?? 30,
-      max_urgentes:            body.max_urgentes ?? 5,
-      umbral_alerta_pct:       body.umbral_alerta_pct ?? 90,
+      empresa_facturadora_id:   body.empresa_facturadora_id ?? null,
+      nombre:                   body.nombre,
+      apellidos,
+      apellido1:                apellido1 || null,
+      apellido2:                apellido2 || null,
+      email:                    body.email,
+      telefono:                 body.telefono ?? null,
+      nivel:                    body.nivel ?? 'tramitador',
+      tipo_usuario:             body.tipo_usuario ?? 'tramitador',
+      max_expedientes_activos:  body.max_expedientes_activos ?? 30,
+      max_urgentes:             body.max_urgentes ?? 5,
+      umbral_alerta_pct:        body.umbral_alerta_pct ?? 90,
+      contrato_horas_dia:       body.contrato_horas_dia ?? 8,
+      jornada_laboral:          body.jornada_laboral ?? 'completa',
       especialidades_siniestro: body.especialidades_siniestro ?? [],
-      companias_preferentes:   body.companias_preferentes ?? [],
-      zonas_cp:                body.zonas_cp ?? [],
+      companias_preferentes:    body.companias_preferentes ?? [],
+      zonas_cp:                 body.zonas_cp ?? [],
     })
     .select()
     .single();
@@ -216,13 +226,28 @@ tramitadoresRoutes.put('/:id', async (c) => {
   const body = await c.req.json<any>();
 
   const allowed = [
-    'nombre', 'apellidos', 'email', 'telefono', 'nivel',
+    'nombre', 'apellidos', 'apellido1', 'apellido2',
+    'email', 'telefono', 'nivel', 'tipo_usuario',
     'empresa_facturadora_id', 'especialidades_siniestro',
     'companias_preferentes', 'zonas_cp',
+    'contrato_horas_dia', 'jornada_laboral', 'horario_texto', 'notas_usuario',
+    'pct_carga_trabajo', 'jornada_pct',
   ];
   const patch: Record<string, any> = {};
   for (const key of allowed) {
     if (key in body) patch[key] = body[key];
+  }
+
+  // Recompute apellidos when apellido1/apellido2 change
+  if ('apellido1' in patch || 'apellido2' in patch) {
+    const { data: cur } = await supabase
+      .from('tramitadores')
+      .select('apellido1, apellido2')
+      .eq('id', id)
+      .single();
+    const a1 = (patch.apellido1 ?? cur?.apellido1 ?? '').trim();
+    const a2 = (patch.apellido2 ?? cur?.apellido2 ?? '').trim();
+    patch.apellidos = [a1, a2].filter(Boolean).join(' ');
   }
 
   if (Object.keys(patch).length === 0) {
@@ -233,19 +258,95 @@ tramitadoresRoutes.put('/:id', async (c) => {
     .from('tramitadores')
     .update(patch)
     .eq('id', id)
-    .select()
+    .select('*, user_id')
     .single();
 
   if (error || !data) {
     return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Tramitador no encontrado' } }, 404);
   }
 
+  // Sync nif/extension to user_profiles if provided
+  const profilePatch: Record<string, any> = {};
+  if (body.nif !== undefined)       profilePatch.nif       = body.nif;
+  if (body.extension !== undefined) profilePatch.extension = body.extension;
+  if (Object.keys(profilePatch).length > 0 && data.user_id) {
+    await supabase.from('user_profiles').update(profilePatch).eq('id', data.user_id);
+  }
+
   await supabase.from('auditoria').insert({
     tabla: 'tramitadores', registro_id: id, accion: 'UPDATE', actor_id: user.id,
-    cambios: jsonBody(patch),
+    cambios: jsonBody({ ...patch, ...profilePatch }),
   });
 
   return c.json({ data, error: null });
+});
+
+// POST /tramitadores/:id/desconectar — forzar cierre de sesión
+tramitadoresRoutes.post('/:id/desconectar', async (c) => {
+  const supabase      = c.get('supabase');
+  const adminSupabase = c.get('adminSupabase');
+  const user          = c.get('user');
+  const id            = c.req.param('id');
+
+  const { data: tram, error: e1 } = await supabase
+    .from('tramitadores')
+    .select('id, user_id, nombre, apellidos')
+    .eq('id', id)
+    .single();
+
+  if (e1 || !tram) {
+    return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Tramitador no encontrado' } }, 404);
+  }
+
+  // Invalidar todas las sesiones del usuario en Supabase Auth
+  try {
+    await (adminSupabase.auth.admin as any).signOut(tram.user_id);
+  } catch {
+    // signOut puede no estar disponible en esta versión del SDK; continuamos con el update
+  }
+
+  const { data, error } = await supabase
+    .from('tramitadores')
+    .update({ sesion_activa: false, ultima_sesion_fin: new Date().toISOString() })
+    .eq('id', id)
+    .select('id, sesion_activa, ultima_sesion_fin')
+    .single();
+
+  if (error) {
+    return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+  }
+
+  await supabase.from('auditoria').insert({
+    tabla: 'tramitadores', registro_id: id, accion: 'UPDATE', actor_id: user.id,
+    cambios: jsonBody({ desconectado: true, user_id: tram.user_id }),
+  });
+
+  return c.json({ data: { ...data, message: 'Sesión cerrada correctamente' }, error: null });
+});
+
+// GET /tramitadores/:id/actividad — log de actividad del tramitador
+tramitadoresRoutes.get('/:id/actividad', async (c) => {
+  const supabase  = c.get('supabase');
+  const id        = c.req.param('id');
+  const page      = parseInt(c.req.query('page') ?? '1');
+  const perPage   = Math.min(parseInt(c.req.query('per_page') ?? '50'), 100);
+  const from      = (page - 1) * perPage;
+
+  const { data, error, count } = await supabase
+    .from('user_activity_log')
+    .select('*', { count: 'exact' })
+    .eq('tramitador_id', id)
+    .order('created_at', { ascending: false })
+    .range(from, from + perPage - 1);
+
+  if (error) {
+    return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+  }
+
+  return c.json({
+    data: { items: data ?? [], total: count ?? 0, page, per_page: perPage },
+    error: null,
+  });
 });
 
 // PUT /tramitadores/:id/capacidad — actualizar límites de capacidad

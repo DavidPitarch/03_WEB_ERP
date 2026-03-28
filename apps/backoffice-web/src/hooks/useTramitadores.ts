@@ -60,6 +60,14 @@ export function useTramitadorPreasignaciones(id: string) {
   });
 }
 
+export function useTramitadorActividad(id: string, page = 1, enabled = true) {
+  return useQuery({
+    queryKey: ['tramitador-actividad', id, page],
+    queryFn: () => api.get<any>(`/tramitadores/${id}/actividad?page=${page}`),
+    enabled: Boolean(id) && enabled,
+  });
+}
+
 export function useColaAsignacion(options?: { empresaId?: string; page?: number }) {
   const params = new URLSearchParams();
   if (options?.empresaId) params.set('empresa_facturadora_id', options.empresaId);
@@ -157,6 +165,16 @@ export function useToggleAusente() {
   return useMutation({
     mutationFn: ({ id, ausente }: { id: string; ausente: boolean }) =>
       api.patch(`/tramitadores/${id}/ausente`, { ausente }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tramitadores'] });
+    },
+  });
+}
+
+export function useDesconectarUsuario() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/tramitadores/${id}/desconectar`, {}),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tramitadores'] });
     },

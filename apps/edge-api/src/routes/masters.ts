@@ -330,9 +330,116 @@ mastersRoutes.put('/operarios/:id', async (c) => {
 
 mastersRoutes.get('/empresas-facturadoras', async (c) => {
   const supabase = c.get('supabase');
-  const { data, error } = await supabase.from('empresas_facturadoras').select('*').eq('activa', true).order('nombre');
+  const activa = c.req.query('activa');
+  let query = supabase.from('empresas_facturadoras').select('*').order('nombre');
+  if (activa === 'true')  query = query.eq('activa', true);
+  if (activa === 'false') query = query.eq('activa', false);
+  const { data, error } = await query;
   if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
   return c.json({ data, error: null });
+});
+
+mastersRoutes.get('/empresas-facturadoras/:id', async (c) => {
+  const supabase = c.get('supabase');
+  const id = c.req.param('id');
+  const { data, error } = await supabase.from('empresas_facturadoras').select('*').eq('id', id).single();
+  if (error || !data) return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Empresa no encontrada' } }, 404);
+  return c.json({ data, error: null });
+});
+
+mastersRoutes.post('/empresas-facturadoras', async (c) => {
+  const supabase = c.get('supabase');
+  const user = c.get('user');
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ data: null, error: { code: 'BAD_REQUEST', message: 'JSON inválido' } }, 400);
+  }
+
+  if (!body.nombre || !body.cif) {
+    return c.json({ data: null, error: { code: 'VALIDATION', message: 'nombre y cif son obligatorios' } }, 422);
+  }
+
+  const { data, error } = await supabase.from('empresas_facturadoras').insert({
+    nombre:           body.nombre,
+    nombre_comercial: body.nombre_comercial ?? null,
+    cif:              body.cif,
+    direccion:        body.direccion ?? null,
+    localidad:        body.localidad ?? null,
+    provincia:        body.provincia ?? null,
+    codigo_postal:    body.codigo_postal ?? null,
+    telefono:         body.telefono ?? null,
+    email:            body.email ?? null,
+    prefijo_facturas: body.prefijo_facturas ?? null,
+    prefijo_abonos:   body.prefijo_abonos ?? null,
+    activa:           body.activa ?? true,
+  }).select().single();
+
+  if (error) {
+    if (error.code === '23505') return c.json({ data: null, error: { code: 'DUPLICATE', message: 'Ya existe una empresa con ese CIF' } }, 409);
+    return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+  }
+
+  await insertAudit(supabase, { tabla: 'empresas_facturadoras', registro_id: data.id, accion: 'INSERT', actor_id: user.id, cambios: body });
+  return c.json({ data, error: null }, 201);
+});
+
+mastersRoutes.put('/empresas-facturadoras/:id', async (c) => {
+  const supabase = c.get('supabase');
+  const user = c.get('user');
+  const id = c.req.param('id');
+  const body = await c.req.json();
+
+  const { data, error } = await supabase.from('empresas_facturadoras').update({
+    nombre:           body.nombre,
+    nombre_comercial: body.nombre_comercial ?? null,
+    cif:              body.cif,
+    direccion:        body.direccion ?? null,
+    localidad:        body.localidad ?? null,
+    provincia:        body.provincia ?? null,
+    codigo_postal:    body.codigo_postal ?? null,
+    telefono:         body.telefono ?? null,
+    email:            body.email ?? null,
+    prefijo_facturas: body.prefijo_facturas ?? null,
+    prefijo_abonos:   body.prefijo_abonos ?? null,
+    activa:           body.activa,
+  }).eq('id', id).select().single();
+
+  if (error) {
+    if (error.code === '23505') return c.json({ data: null, error: { code: 'DUPLICATE', message: 'Ya existe una empresa con ese CIF' } }, 409);
+    return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+  }
+  if (!data) return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Empresa no encontrada' } }, 404);
+
+  await insertAudit(supabase, { tabla: 'empresas_facturadoras', registro_id: id, accion: 'UPDATE', actor_id: user.id, cambios: body });
+  return c.json({ data, error: null });
+});
+
+mastersRoutes.delete('/empresas-facturadoras/:id', async (c) => {
+  const supabase = c.get('supabase');
+  const user = c.get('user');
+  const id = c.req.param('id');
+
+  // Verificar si tiene expedientes asociados antes de eliminar
+  const { count } = await supabase
+    .from('expedientes')
+    .select('id', { count: 'exact', head: true })
+    .eq('empresa_facturadora_id', id);
+
+  if (count && count > 0) {
+    return c.json({
+      data: null,
+      error: { code: 'CONSTRAINT', message: `Esta empresa tiene ${count} expediente(s) asociados. Desactívela en lugar de eliminarla.` },
+    }, 409);
+  }
+
+  const { error } = await supabase.from('empresas_facturadoras').delete().eq('id', id);
+  if (error) return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+
+  await insertAudit(supabase, { tabla: 'empresas_facturadoras', registro_id: id, accion: 'DELETE', actor_id: user.id, cambios: {} });
+  return c.json({ data: { deleted: true }, error: null });
 });
 
 // ═══════════════════════════════════════

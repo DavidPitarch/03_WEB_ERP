@@ -155,10 +155,39 @@ export function useUpdateOperario() {
   });
 }
 
-export function useEmpresasFacturadoras() {
+export function useEmpresasFacturadoras(filters?: { activa?: boolean }) {
+  const params = new URLSearchParams();
+  if (filters?.activa !== undefined) params.set('activa', String(filters.activa));
+  const qs = params.toString();
   return useQuery({
-    queryKey: ['empresas-facturadoras'],
-    queryFn: () => api.get<EmpresaFacturadora[]>('/masters/empresas-facturadoras'),
+    queryKey: ['empresas-facturadoras', filters],
+    queryFn: () => api.get<EmpresaFacturadora[]>(`/masters/empresas-facturadoras${qs ? `?${qs}` : ''}`),
+  });
+}
+
+export function useCreateEmpresaFacturadora() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<EmpresaFacturadora>) =>
+      api.post<EmpresaFacturadora>('/masters/empresas-facturadoras', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['empresas-facturadoras'] }),
+  });
+}
+
+export function useUpdateEmpresaFacturadora() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<EmpresaFacturadora> & { id: string }) =>
+      api.put<EmpresaFacturadora>(`/masters/empresas-facturadoras/${id}`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['empresas-facturadoras'] }),
+  });
+}
+
+export function useDeleteEmpresaFacturadora() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del<{ deleted: boolean }>(`/masters/empresas-facturadoras/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['empresas-facturadoras'] }),
   });
 }
 

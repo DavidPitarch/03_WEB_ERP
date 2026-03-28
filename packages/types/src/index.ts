@@ -115,10 +115,19 @@ export interface Compania {
 export interface EmpresaFacturadora {
   id: string;
   nombre: string;
+  nombre_comercial: string | null;
   cif: string;
-  direccion: string;
+  direccion: string | null;
+  localidad: string | null;
+  provincia: string | null;
+  codigo_postal: string | null;
+  telefono: string | null;
+  email: string | null;
+  prefijo_facturas: string | null;
+  prefijo_abonos: string | null;
   activa: boolean;
   created_at: string;
+  updated_at: string | null;
 }
 
 export interface Operario {

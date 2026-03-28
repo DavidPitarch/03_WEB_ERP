@@ -50,6 +50,7 @@ export interface Expediente {
   numero_siniestro_cia: string | null;
   tipo_siniestro: string;
   descripcion: string;
+  declaracion_siniestro: string | null;
   direccion_siniestro: string;
   codigo_postal: string;
   localidad: string;
@@ -622,6 +623,7 @@ export interface CreateExpedienteRequest {
   empresa_facturadora_id: string;
   tipo_siniestro: string;
   descripcion: string;
+  declaracion_siniestro?: string;
   direccion_siniestro: string;
   codigo_postal: string;
   localidad: string;

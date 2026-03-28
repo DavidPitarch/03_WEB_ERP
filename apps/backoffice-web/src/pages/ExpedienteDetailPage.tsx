@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useRef, useEffect, type FormEvent } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import type { CustomerTrackingIssueLinkResponse } from '@erp/types';
@@ -6,7 +6,12 @@ import { useExpediente, useExpedienteTimeline, useExpedientePartes, useTransicio
 import { useRealtimeExpediente } from '@/hooks/useRealtime';
 import { NuevaCitaModal } from '@/components/NuevaCitaModal';
 import { EmitirAutocitaButton } from '@/components/EmitirAutocitaButton';
+import { useCompaniaTramitadores } from '@/hooks/useMasters';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { api } from '@/lib/api';
+
+/** Roles que pueden reasignar tramitador (todos excepto tramitador estándar) */
+const ROLES_PUEDE_REASIGNAR = ['admin', 'supervisor', 'financiero', 'direccion'];
 
 const ESTADO_LABELS: Record<string, string> = {
   NUEVO: 'Nuevo', NO_ASIGNADO: 'No asignado', EN_PLANIFICACION: 'En planificación',
@@ -47,6 +52,8 @@ export function ExpedienteDetailPage() {
   const [timelineFilter, setTimelineFilter] = useState<string>('all');
   const [trackingLink, setTrackingLink] = useState<string | null>(null);
   const [trackingExpiry, setTrackingExpiry] = useState<string | null>(null);
+  const [showTramitadorPicker, setShowTramitadorPicker] = useState(false);
+  const tramitadorPickerRef = useRef<HTMLDivElement>(null);
 
   // Pedidos de material del expediente
   const { data: pedidosResult } = useQuery({
@@ -56,6 +63,10 @@ export function ExpedienteDetailPage() {
 
   // Realtime
   useRealtimeExpediente(id!);
+
+  // Perfil + roles del usuario actual
+  const { data: userProfile } = useUserProfile();
+  const puedeReasignarTramitador = ROLES_PUEDE_REASIGNAR.some(r => userProfile?.roles?.includes(r) ?? false);
 
   // Nota interna
   const [nota, setNota] = useState('');
@@ -82,11 +93,37 @@ export function ExpedienteDetailPage() {
     },
   });
 
+  const tramitadorMut = useMutation({
+    mutationFn: (tramitadorId: string) =>
+      api.patch(`/expedientes/${id}/tramitador`, { tramitador_id: tramitadorId, force: true }),
+    onSuccess: () => {
+      setShowTramitadorPicker(false);
+      qc.invalidateQueries({ queryKey: ['expediente', id] });
+    },
+  });
+
+  // Cerrar picker al hacer clic fuera
+  useEffect(() => {
+    if (!showTramitadorPicker) return;
+    const handler = (e: MouseEvent) => {
+      if (tramitadorPickerRef.current && !tramitadorPickerRef.current.contains(e.target as Node)) {
+        setShowTramitadorPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showTramitadorPicker]);
+
   const handleAddNota = (e: FormEvent) => {
     e.preventDefault();
     if (!nota.trim()) return;
     notaMut.mutate(nota);
   };
+
+  // Tramitadores de la compañía del expediente (para el picker)
+  const companiaId = expResult && 'data' in expResult ? (expResult.data as any)?.compania_id ?? null : null;
+  const { data: tramitadoresRes } = useCompaniaTramitadores(companiaId);
+  const tramitadoresCompania: any[] = tramitadoresRes && 'data' in tramitadoresRes ? (tramitadoresRes.data ?? []) : [];
 
   if (isLoading) return <div className="loading">Cargando...</div>;
 
@@ -139,6 +176,45 @@ export function ExpedienteDetailPage() {
           <div className="detail-header-badges">
             <span className="badge estado-badge">{ESTADO_LABELS[e.estado] ?? e.estado}</span>
             <span className={`badge prioridad-${e.prioridad}`}>{e.prioridad}</span>
+
+            {/* ─── Tramitador ─── */}
+            <div ref={tramitadorPickerRef} style={{ position: 'relative', display: 'inline-block' }}>
+              <button
+                type="button"
+                className={`badge badge-tramitador${puedeReasignarTramitador ? ' badge-tramitador--editable' : ''}`}
+                onClick={() => puedeReasignarTramitador && setShowTramitadorPicker(v => !v)}
+                title={puedeReasignarTramitador ? 'Cambiar tramitador' : undefined}
+              >
+                <span className="badge-tramitador-icon">👤</span>
+                {e.tramitadores
+                  ? `${e.tramitadores.nombre} ${e.tramitadores.apellidos}`
+                  : 'Sin tramitador'}
+                {puedeReasignarTramitador && <span className="badge-tramitador-caret">▾</span>}
+              </button>
+
+              {showTramitadorPicker && (
+                <div className="tramitador-picker">
+                  <div className="tramitador-picker-header">Reasignar tramitador</div>
+                  {tramitadoresCompania.length === 0 && (
+                    <div className="tramitador-picker-empty">Sin tramitadores en esta compañía</div>
+                  )}
+                  {tramitadoresCompania.map((t: any) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className={`tramitador-picker-item${e.tramitador_id === t.id ? ' tramitador-picker-item--active' : ''}`}
+                      onClick={() => tramitadorMut.mutate(t.id)}
+                      disabled={tramitadorMut.isPending}
+                    >
+                      {t.nombre} {t.apellidos}
+                    </button>
+                  ))}
+                  {tramitadorMut.isError && (
+                    <div className="tramitador-picker-error">Error al reasignar</div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
         <div className="detail-actions">
@@ -158,6 +234,14 @@ export function ExpedienteDetailPage() {
 
       {transicion.isError && (
         <div className="form-error">Error al cambiar estado. Verifica las precondiciones.</div>
+      )}
+
+      {/* Declaración de siniestro */}
+      {e.declaracion_siniestro && (
+        <div className="declaracion-siniestro-bar">
+          <span className="declaracion-siniestro-label">Declaración de siniestro</span>
+          <p className="declaracion-siniestro-text">{e.declaracion_siniestro}</p>
+        </div>
       )}
 
       {/* Datos */}

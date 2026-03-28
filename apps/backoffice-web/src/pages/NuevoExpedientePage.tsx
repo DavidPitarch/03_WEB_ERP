@@ -16,10 +16,6 @@ export function NuevoExpedientePage() {
   const companias = companiasRes && 'data' in companiasRes ? companiasRes.data ?? [] : [];
   const empresas = empresasRes && 'data' in empresasRes ? empresasRes.data ?? [] : [];
 
-  // Tipos de siniestro filtrados por compañía seleccionada
-  const { data: tiposRes } = useTiposSiniestroForCompania(form.compania_id || null);
-  const tipos = tiposRes && 'data' in tiposRes ? (tiposRes.data ?? []) : [];
-
   // Asegurado search
   const [aseguradoSearch, setAseguradoSearch] = useState('');
   const [aseguradoMode, setAseguradoMode] = useState<'existing' | 'new'>('new');
@@ -55,6 +51,10 @@ export function NuevoExpedientePage() {
   });
 
   const [error, setError] = useState('');
+
+  // Tipos de siniestro filtrados por compañía seleccionada (necesita form.compania_id)
+  const { data: tiposRes } = useTiposSiniestroForCompania(form.compania_id || null);
+  const tipos = tiposRes && 'data' in tiposRes ? (tiposRes.data ?? []) : [];
 
   const mutation = useMutation({
     mutationFn: (data: CreateExpedienteRequest) => api.post('/expedientes', data),

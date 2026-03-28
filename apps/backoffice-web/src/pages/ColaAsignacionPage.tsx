@@ -99,9 +99,9 @@ export function ColaAsignacionPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
-          <h2 style={{ margin: 0 }}>Cola de Asignación</h2>
+          <h2 style={{ margin: 0 }}>Asignaciones</h2>
           <p className="text-muted" style={{ margin: '4px 0 0' }}>
-            Expedientes sin tramitador asignado — {total} pendientes
+            Expedientes en entrada (NUEVO / NO ASIGNADO) — {total} pendientes
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>

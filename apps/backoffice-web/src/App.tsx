@@ -59,7 +59,6 @@ import { EventosPage } from '@/pages/EventosPage';
 // Nuevas páginas stub (Planning y Operaciones)
 import { PlanningPage } from '@/pages/PlanningPage';
 import { PlanningGeoPage } from '@/pages/PlanningGeoPage';
-import { AsignacionesPage } from '@/pages/AsignacionesPage';
 import { TrabajosPendientesPage } from '@/pages/TrabajosPendientesPage';
 import { PerfilPage } from '@/pages/PerfilPage';
 import { ComercialesPage } from '@/pages/ComercialesPage';

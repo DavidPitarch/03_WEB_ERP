@@ -113,8 +113,7 @@ asignacionesRoutes.get('/cola', async (c) => {
       '*, companias(nombre, codigo), asegurados(nombre, apellidos, telefono)',
       { count: 'exact' }
     )
-    .is('tramitador_id', null)
-    .not('estado', 'in', '(CERRADO,CANCELADO,COBRADO,FACTURADO)');
+    .in('estado', ['NUEVO', 'NO_ASIGNADO']);
 
   if (empresaId) query = query.eq('empresa_facturadora_id', empresaId);
 

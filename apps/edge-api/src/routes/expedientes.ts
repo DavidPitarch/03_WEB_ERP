@@ -7,6 +7,7 @@ import {
   transitionExpedienteCommand,
 } from '../services/core-commands';
 import { validate, validationError } from '../validation/schema';
+import { suggestTramitador } from '../services/assignment-engine';
 import type { Env } from '../types';
 
 export const expedientesRoutes = new Hono<{ Bindings: Env }>();
@@ -123,6 +124,37 @@ expedientesRoutes.post('/', async (c) => {
       user.id,
       getRequestIp(c),
     );
+
+    // Auto-asignación: tramitador con menor carga según reglas de preasignación y reparto
+    try {
+      const sugerencias = await suggestTramitador(
+        {
+          id:                    data.id,
+          compania_id:           data.compania_id,
+          tipo_siniestro:        data.tipo_siniestro,
+          prioridad:             data.prioridad,
+          codigo_postal:         data.codigo_postal,
+          empresa_facturadora_id: data.empresa_facturadora_id,
+        },
+        supabase,
+        1,
+      );
+
+      if (sugerencias.length > 0 && sugerencias[0].puede_aceptar) {
+        await supabase.rpc('erp_asignar_tramitador', {
+          p_expediente_id: data.id,
+          p_tramitador_id: sugerencias[0].tramitador_id,
+          p_motivo:        'Asignación automática por carga',
+          p_motivo_codigo: 'auto_carga',
+          p_actor_id:      'system',
+          p_force:         false,
+        });
+        void supabase.rpc('refresh_carga_tramitadores_sync');
+        data.tramitador_id = sugerencias[0].tramitador_id;
+      }
+    } catch {
+      // Error silencioso: el expediente queda creado; asignación manual en bandeja
+    }
 
     return c.json({ data, error: null }, 201);
   } catch (error) {

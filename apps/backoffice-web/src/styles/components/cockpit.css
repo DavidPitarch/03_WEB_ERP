@@ -4,40 +4,6 @@
    inspirado en cockpits de ERP de alta densidad informativa.
    ═══════════════════════════════════════════════════════ */
 
-/* ── Barra de control (ultra-thin) ────────────────────── */
-.cockpit-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 3px var(--space-3);
-  background: var(--color-bg-subtle);
-  border-bottom: 1px solid var(--color-border-default);
-  min-height: var(--cockpit-bar-h);
-}
-.cockpit-bar__label {
-  font-size: 10px;
-  font-weight: var(--weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-text-tertiary);
-}
-.cockpit-bar__toggle {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  padding: 1px var(--space-2);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border-default);
-  background: transparent;
-  color: var(--color-text-tertiary);
-  font-size: 10px;
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-.cockpit-bar__toggle:hover {
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-}
 
 /* ── Contenedor de los 3 módulos (compacto) ────────────── */
 .top-cockpit {
@@ -49,10 +15,6 @@
   border-bottom: 1px solid var(--color-border-default);
 }
 
-/* Colapsado */
-.top-cockpit.cockpit--collapsed {
-  display: none;
-}
 
 /* ── Tarjeta de módulo (sin borde redondeado grande) ────── */
 .cockpit-module {

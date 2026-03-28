@@ -28,7 +28,7 @@ a:hover { text-decoration: underline; }
   grid-template-columns: var(--sidebar-width) 1fr;
   grid-template-areas:
     "header  header"
-    "cockpit cockpit"
+    "sidebar cockpit"
     "sidebar main";
   background: var(--color-bg-base);
 }

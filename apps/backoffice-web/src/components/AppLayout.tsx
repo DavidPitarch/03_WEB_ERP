@@ -8,23 +8,10 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { TopCockpit } from '@/components/layout/TopCockpit';
 import { useTheme } from '@/hooks/useTheme';
 
-const LS_COCKPIT_KEY = 'erp:cockpit:collapsed';
-
 export function AppLayout() {
   useTheme();
 
-  const [sidebarOpen,      setSidebarOpen]      = useState(false);
-  const [cockpitCollapsed, setCockpitCollapsed] = useState<boolean>(() => {
-    return localStorage.getItem(LS_COCKPIT_KEY) === 'true';
-  });
-
-  const toggleCockpit = () => {
-    setCockpitCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem(LS_COCKPIT_KEY, String(next));
-      return next;
-    });
-  };
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="app-layout">
@@ -53,17 +40,14 @@ export function AppLayout() {
       {/* ── SIDEBAR ── */}
       <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      {/* ── COCKPIT OPERATIVO — franja fija entre header y contenido ── */}
+      {/* ── COCKPIT OPERATIVO — franja superior derecha, junto al sidebar ── */}
       <div className="app-cockpit">
-        <TopCockpit collapsed={cockpitCollapsed} onToggle={toggleCockpit} />
+        <TopCockpit />
       </div>
 
       {/* ── CONTENIDO PRINCIPAL ── */}
       <main className="app-main">
-        {/* Alertas del sistema */}
         <AlertBanner />
-
-        {/* Página activa */}
         <Outlet />
       </main>
     </div>

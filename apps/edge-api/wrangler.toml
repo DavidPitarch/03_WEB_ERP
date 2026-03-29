@@ -1,4 +1,4 @@
-name = "erp-siniestros-api"
+name = "gestion-siniestros"
 main = "src/index.ts"
 compatibility_date = "2024-06-01"
 
@@ -11,101 +11,43 @@ compatibility_date = "2024-06-01"
 # binding = "RATE_LIMIT_KV"
 # id = "PLACEHOLDER_KV_NAMESPACE_ID"
 
-# ─── Entorno de desarrollo (por defecto) ────────────────────────────────────
+# ─── Variables de entorno ────────────────────────────────────────────────────
 [vars]
-ENVIRONMENT = "development"
-
-# Queues are not active in local dev (wrangler dev has no real queue support).
-# The DOMAIN_EVENTS_QUEUE binding is optional in Env — code falls back to stub mode.
-# To test queues locally: use `wrangler dev --remote` with a real CF account.
-
-# Cron Triggers (watchdogs) — 7:00 y 13:00 UTC
-# Solo se activan en demo y production (ver más abajo)
-# [triggers]
-# crons = ["0 7 * * *", "0 13 * * *"]
-
-
-# ─── Entorno demo ─────────────────────────────────────────────────────────────
-# Deploy: wrangler deploy --env demo
-# URL pública: https://erp-siniestros-api-demo.<account>.workers.dev
-#
-# Secrets (cargar con `wrangler secret put <NAME> --env demo`):
-#   SUPABASE_URL               — URL Supabase (misma instancia o proyecto demo separado)
-#   SUPABASE_ANON_KEY          — Clave anónima Supabase
-#   SUPABASE_SERVICE_ROLE_KEY  — Clave service role Supabase
-#   RESEND_API_KEY             — Key Resend (re_TestXXX para test sin envíos reales)
-#   CONFIRM_BASE_URL           — URL del frontend demo (ej. https://erp-demo.pages.dev)
-#   ALLOWED_ORIGINS            — Misma URL que CONFIRM_BASE_URL
-#   VP_WEBHOOK_SECRET          — (opcional en demo) Secret HMAC para webhooks VP
-#
-[env.demo]
-name = "gestion-siniestros"
-
-[env.demo.vars]
-ENVIRONMENT = "demo"
-
-[env.demo.triggers]
-crons = ["0 7 * * *", "0 13 * * *"]
-
-# Queue bindings — demo
-# Create queues first: wrangler queues create domain-events --env demo
-#                      wrangler queues create domain-events-dlq --env demo
-[[env.demo.queues.producers]]
-queue = "domain-events"
-binding = "DOMAIN_EVENTS_QUEUE"
-
-[[env.demo.queues.consumers]]
-queue = "domain-events"
-max_batch_size = 10
-max_batch_timeout = 5
-max_retries = 3
-dead_letter_queue = "domain-events-dlq"
-
-[[env.demo.queues.consumers]]
-queue = "domain-events-dlq"
-max_batch_size = 5
-max_batch_timeout = 30
-max_retries = 0
-
-
-# ─── Entorno de producción ───────────────────────────────────────────────────
-# Deploy: wrangler deploy --env production
-#
-# Secrets requeridos (cargar con `wrangler secret put <NAME> --env production`):
-#   SUPABASE_URL                — URL del proyecto Supabase de producción
-#   SUPABASE_ANON_KEY           — Clave anónima de Supabase
-#   SUPABASE_SERVICE_ROLE_KEY   — Clave de service role (nunca en este fichero)
-#   RESEND_API_KEY              — API key de Resend para email real
-#   VP_WEBHOOK_SECRET           — Secret HMAC para verificar webhooks VP
-#   CONFIRM_BASE_URL            — URL base del portal de confirmación/tracking
-#   ALLOWED_ORIGINS             — Orígenes CORS en producción (comma-separated)
-#
-# Sin estos secrets, el health check devolverá 207 degraded.
-[env.production]
-name = "erp-siniestros-api"
-
-[env.production.vars]
 ENVIRONMENT = "production"
 
-[env.production.triggers]
+# ─── Cron Triggers (watchdogs) — 7:00 y 13:00 UTC ───────────────────────────
+[triggers]
 crons = ["0 7 * * *", "0 13 * * *"]
 
-# Queue bindings — production
-# Create queues first: wrangler queues create domain-events --env production
-#                      wrangler queues create domain-events-dlq --env production
-[[env.production.queues.producers]]
+# ─── Queue bindings ──────────────────────────────────────────────────────────
+# Create queues first: wrangler queues create domain-events
+#                      wrangler queues create domain-events-dlq
+[[queues.producers]]
 queue = "domain-events"
 binding = "DOMAIN_EVENTS_QUEUE"
 
-[[env.production.queues.consumers]]
+[[queues.consumers]]
 queue = "domain-events"
 max_batch_size = 10
 max_batch_timeout = 5
 max_retries = 3
 dead_letter_queue = "domain-events-dlq"
 
-[[env.production.queues.consumers]]
+[[queues.consumers]]
 queue = "domain-events-dlq"
 max_batch_size = 5
 max_batch_timeout = 30
 max_retries = 0
+
+# ─── Secrets (cargar con `wrangler secret put <NAME>`) ───────────────────────
+# SUPABASE_URL               — URL del proyecto Supabase
+# SUPABASE_ANON_KEY          — Clave anonima Supabase
+# SUPABASE_SERVICE_ROLE_KEY  — Clave service role Supabase
+# RESEND_API_KEY             — API key de Resend
+# CONFIRM_BASE_URL           — URL base del frontend (https://gestion-siniestros.pages.dev)
+# ALLOWED_ORIGINS            — Origenes CORS (comma-separated)
+# VP_WEBHOOK_SECRET          — Secret HMAC para webhooks VP
+#
+# Deploy: wrangler deploy
+# URL:    https://gestion-siniestros.david-pitarch.workers.dev
+# Health: /health

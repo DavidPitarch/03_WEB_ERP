@@ -43,7 +43,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_API_URL: https://erp-siniestros-api.david-pitarch.workers.dev
+          VITE_API_URL: https://gestion-siniestros.david-pitarch.workers.dev
 
       - name: Deploy to Cloudflare Pages
         working-directory: apps/backoffice-web

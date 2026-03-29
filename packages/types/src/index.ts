@@ -19,6 +19,69 @@ export const EXPEDIENTE_ESTADOS = [
 
 export type ExpedienteEstado = (typeof EXPEDIENTE_ESTADOS)[number];
 
+// ─── Estados operativos del expediente ───
+export const ESTADOS_OPERATIVOS = [
+  'ASIGNACION',
+  'ASEGURADO_1ER_CONTACTO',
+  'PRIMERA_VISITA_COORDINADA',
+  'PRIMERA_CITA_COMPLETADA',
+  'VALORACION',
+  'PRESUPUESTO_ACEPTADO',
+  'CITA_COORDINADA',
+  'REPARACION_EN_CURSO',
+  'LIQUIDACION_TRABAJOS',
+  'FINALIZADO',
+  'FACTURADO',
+  'REAPERTURA',
+] as const;
+
+export type EstadoOperativo = (typeof ESTADOS_OPERATIVOS)[number];
+
+export const ESTADO_OPERATIVO_LABELS: Record<EstadoOperativo, string> = {
+  ASIGNACION: 'Asignación',
+  ASEGURADO_1ER_CONTACTO: 'Asegurado 1º Contacto',
+  PRIMERA_VISITA_COORDINADA: 'Primera Visita Coordinada',
+  PRIMERA_CITA_COMPLETADA: '1ª Cita Completada',
+  VALORACION: 'Valoración',
+  PRESUPUESTO_ACEPTADO: 'Presupuesto Aceptado',
+  CITA_COORDINADA: 'Cita Coordinada',
+  REPARACION_EN_CURSO: 'Reparación en Curso',
+  LIQUIDACION_TRABAJOS: 'Liquidación Trabajos',
+  FINALIZADO: 'Finalizado',
+  FACTURADO: 'Facturado',
+  REAPERTURA: 'Reapertura',
+};
+
+export const ESTADO_OPERATIVO_COLORS: Record<EstadoOperativo, string> = {
+  ASIGNACION: '#64748b',               // slate-500
+  ASEGURADO_1ER_CONTACTO: '#3b82f6',   // blue-500
+  PRIMERA_VISITA_COORDINADA: '#6366f1', // indigo-500
+  PRIMERA_CITA_COMPLETADA: '#8b5cf6',   // violet-500
+  VALORACION: '#f59e0b',                // amber-500
+  PRESUPUESTO_ACEPTADO: '#10b981',      // emerald-500
+  CITA_COORDINADA: '#14b8a6',           // teal-500
+  REPARACION_EN_CURSO: '#f97316',       // orange-500
+  LIQUIDACION_TRABAJOS: '#eab308',      // yellow-500
+  FINALIZADO: '#22c55e',                // green-500
+  FACTURADO: '#059669',                 // emerald-600
+  REAPERTURA: '#ef4444',                // red-500
+};
+
+// Orden secuencial de fases (excluye REAPERTURA que es excepcional)
+export const ESTADO_OPERATIVO_ORDER: EstadoOperativo[] = [
+  'ASIGNACION',
+  'ASEGURADO_1ER_CONTACTO',
+  'PRIMERA_VISITA_COORDINADA',
+  'PRIMERA_CITA_COMPLETADA',
+  'VALORACION',
+  'PRESUPUESTO_ACEPTADO',
+  'CITA_COORDINADA',
+  'REPARACION_EN_CURSO',
+  'LIQUIDACION_TRABAJOS',
+  'FINALIZADO',
+  'FACTURADO',
+];
+
 // ─── Roles ───
 export const ROLES = [
   'admin',
@@ -39,6 +102,7 @@ export interface Expediente {
   id: string;
   numero_expediente: string;
   estado: ExpedienteEstado;
+  estado_operativo: EstadoOperativo;
   compania_id: string;
   empresa_facturadora_id: string;
   asegurado_id: string;
@@ -57,6 +121,7 @@ export interface Expediente {
   provincia: string;
   fecha_encargo: string;
   fecha_limite_sla: string | null;
+  fecha_proximo_hito: string | null;
   prioridad: 'baja' | 'media' | 'alta' | 'urgente';
   created_at: string;
   updated_at: string;

@@ -2,7 +2,10 @@ import { useState, useRef, useEffect, type FormEvent } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import type { CustomerTrackingIssueLinkResponse } from '@erp/types';
-import { useExpediente, useExpedienteTimeline, useExpedientePartes, useTransicionEstado } from '@/hooks/useExpedientes';
+import { useExpediente, useExpedienteTimeline, useExpedientePartes, useTransicionEstado, useCambioEstadoOperativo, useActualizarFechaHito } from '@/hooks/useExpedientes';
+import { ESTADO_OPERATIVO_LABELS } from '@erp/types';
+import type { EstadoOperativo } from '@erp/types';
+import { EstadoOperativoStepper } from '@/components/EstadoOperativoStepper';
 import { useRealtimeExpediente } from '@/hooks/useRealtime';
 import { NuevaCitaModal } from '@/components/NuevaCitaModal';
 import { EmitirAutocitaButton } from '@/components/EmitirAutocitaButton';
@@ -47,6 +50,8 @@ export function ExpedienteDetailPage() {
   const { data: timelineResult } = useExpedienteTimeline(id!);
   const { data: partesResult } = useExpedientePartes(id!);
   const transicion = useTransicionEstado();
+  const cambioEstadoOp = useCambioEstadoOperativo();
+  const actualizarHito = useActualizarFechaHito();
   const [showCitaModal, setShowCitaModal] = useState(false);
   const [showPedidoModal, setShowPedidoModal] = useState(false);
   const [timelineFilter, setTimelineFilter] = useState<string>('all');
@@ -244,6 +249,31 @@ export function ExpedienteDetailPage() {
         </div>
       )}
 
+      {/* Estado operativo + SLA hito */}
+      <section className="detail-section">
+        <EstadoOperativoStepper
+          currentEstado={e.estado_operativo ?? 'ASIGNACION'}
+          onChangeEstado={(estado, mensaje) => {
+            cambioEstadoOp.mutate({ id: id!, estado_nuevo: estado, mensaje });
+          }}
+          isPending={cambioEstadoOp.isPending}
+          disabled={e.estado === 'CERRADO' || e.estado === 'CANCELADO'}
+        />
+        {cambioEstadoOp.isError && (
+          <div className="form-error">Error al cambiar estado operativo</div>
+        )}
+
+        <SlaHitoPicker
+          expedienteId={id!}
+          fechaActual={e.fecha_proximo_hito}
+          onUpdate={(fecha, motivo) => {
+            actualizarHito.mutate({ id: id!, fecha_proximo_hito: fecha, motivo });
+          }}
+          isPending={actualizarHito.isPending}
+          disabled={e.estado === 'CERRADO' || e.estado === 'CANCELADO'}
+        />
+      </section>
+
       {/* Datos */}
       <div className="detail-grid">
         <section className="detail-section">
@@ -439,8 +469,24 @@ export function ExpedienteDetailPage() {
                   )}
                   {item.timeline_type === 'comunicacion' && (
                     <span>
-                      <strong>[{item.tipo}]</strong> {item.contenido}
-                      {item.actor_nombre && <span className="text-muted"> — {item.actor_nombre}</span>}
+                      {item.metadata?.subtipo === 'cambio_estado_operativo' ? (
+                        <>
+                          <strong>[Estado Op.]</strong>{' '}
+                          {ESTADO_OPERATIVO_LABELS[item.metadata.estado_anterior as EstadoOperativo] ?? '—'}
+                          {' → '}
+                          {ESTADO_OPERATIVO_LABELS[item.metadata.estado_nuevo as EstadoOperativo] ?? item.metadata.estado_nuevo}
+                          {item.contenido && <em> — {item.contenido}</em>}
+                        </>
+                      ) : item.metadata?.subtipo === 'cambio_fecha_hito' ? (
+                        <>
+                          <strong>[SLA Hito]</strong> {item.contenido}
+                        </>
+                      ) : (
+                        <>
+                          <strong>[{item.tipo}]</strong> {item.contenido}
+                          {item.actor_nombre && <span className="text-muted"> — {item.actor_nombre}</span>}
+                        </>
+                      )}
                     </span>
                   )}
                   {item.timeline_type === 'cita' && (
@@ -457,6 +503,92 @@ export function ExpedienteDetailPage() {
 
       {showCitaModal && <NuevaCitaModal expedienteId={id!} onClose={() => setShowCitaModal(false)} />}
       {showPedidoModal && <CrearPedidoModal expedienteId={id!} onClose={() => setShowPedidoModal(false)} />}
+    </div>
+  );
+}
+
+// ─── SLA Hito Picker inline ───
+function SlaHitoPicker({
+  fechaActual,
+  onUpdate,
+  isPending,
+  disabled,
+}: {
+  expedienteId: string;
+  fechaActual: string | null;
+  onUpdate: (fecha: string | null, motivo?: string) => void;
+  isPending?: boolean;
+  disabled?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [fecha, setFecha] = useState('');
+
+  const today = new Date().toISOString().split('T')[0];
+  const hitoDate = fechaActual?.split('T')[0] ?? null;
+  const slaStatus = !hitoDate ? null : hitoDate < today ? 'vencido' : hitoDate === today ? 'hoy' : 'ok';
+
+  const handleSave = () => {
+    if (!fecha) return;
+    onUpdate(fecha + 'T00:00:00.000Z');
+    setEditing(false);
+  };
+
+  const handleClear = () => {
+    onUpdate(null, 'Fecha hito eliminada');
+    setEditing(false);
+  };
+
+  return (
+    <div className="sla-hito-section">
+      <span className="sla-hito-section__label">Próximo hito SLA</span>
+
+      {!editing ? (
+        <>
+          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)' }}>
+            {hitoDate
+              ? new Date(fechaActual!).toLocaleDateString('es-ES')
+              : '— Sin fecha —'}
+          </span>
+
+          {slaStatus && (
+            <span className={`sla-hito-section__status sla-hito-section__status--${slaStatus}`}>
+              {slaStatus === 'vencido' ? 'Vencido' : slaStatus === 'hoy' ? 'Vence hoy' : 'OK'}
+            </span>
+          )}
+
+          {!disabled && (
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              onClick={() => { setFecha(hitoDate ?? ''); setEditing(true); }}
+              disabled={isPending}
+            >
+              {hitoDate ? 'Cambiar' : 'Establecer'}
+            </button>
+          )}
+        </>
+      ) : (
+        <>
+          <input
+            type="date"
+            className="sla-hito-section__date"
+            value={fecha}
+            onChange={(ev) => setFecha(ev.target.value)}
+            autoFocus
+          />
+          <button type="button" className="btn-primary btn-sm" onClick={handleSave} disabled={!fecha || isPending}>
+            {isPending ? 'Guardando...' : 'Guardar'}
+          </button>
+          {hitoDate && (
+            <button type="button" className="btn-secondary btn-sm" onClick={handleClear} disabled={isPending}>
+              Eliminar
+            </button>
+          )}
+          <button type="button" className="btn-secondary btn-sm" onClick={() => setEditing(false)} disabled={isPending}>
+            Cancelar
+          </button>
+        </>
+      )}
     </div>
   );
 }

@@ -8,6 +8,7 @@ const EMPTY_FEED: CockpitFeed = {
   asignaciones:          EMPTY_MODULE,
   solicitudes:           EMPTY_MODULE,
   trabajos_no_revisados: EMPTY_MODULE,
+  tareas_caducadas:      EMPTY_MODULE,
 };
 
 /**
@@ -48,7 +49,7 @@ export function useCockpit(activeFilter?: Record<string, string>) {
  * Útil si se quiere cargar de forma independiente por módulo.
  */
 export function useCockpitModule(
-  moduleId: 'asignaciones' | 'solicitudes' | 'trabajos_no_revisados',
+  moduleId: 'asignaciones' | 'solicitudes' | 'trabajos_no_revisados' | 'tareas_caducadas',
   filter?: string,
 ) {
   const { feed, isLoading, isError } = useCockpit(filter ? { filter } : undefined);

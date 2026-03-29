@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
-import type { CreateExpedienteRequest, ExpedienteEstado } from '@erp/types';
+import type { CreateExpedienteRequest, ExpedienteEstado, EstadoOperativo } from '@erp/types';
+import { ESTADOS_OPERATIVOS } from '@erp/types';
 import { getRequestIp } from '../http/request-metadata';
 import {
   createExpedienteCommand,
@@ -306,6 +307,162 @@ expedientesRoutes.get('/:id/sla', async (c) => {
   const { calculateSlaStatus } = await import('../services/sla-engine');
   const sla = await calculateSlaStatus(supabase, id);
   return c.json({ data: sla, error: null });
+});
+
+// PATCH /expedientes/:id/estado-operativo - Cambio de estado operativo (con mensaje obligatorio)
+expedientesRoutes.patch('/:id/estado-operativo', async (c) => {
+  const supabase = c.get('adminSupabase');
+  const user = c.get('user');
+  const id = c.req.param('id');
+  const { estado_nuevo, mensaje } = await c.req.json<{
+    estado_nuevo: EstadoOperativo;
+    mensaje: string;
+  }>();
+
+  if (!estado_nuevo || !ESTADOS_OPERATIVOS.includes(estado_nuevo)) {
+    return c.json({ data: null, error: { code: 'VALIDATION', message: 'estado_nuevo inválido' } }, 422);
+  }
+  if (!mensaje || mensaje.trim().length === 0) {
+    return c.json({ data: null, error: { code: 'VALIDATION', message: 'El mensaje es obligatorio para cambiar el estado operativo' } }, 422);
+  }
+  if (mensaje.length > 500) {
+    return c.json({ data: null, error: { code: 'VALIDATION', message: 'El mensaje no puede superar 500 caracteres' } }, 422);
+  }
+
+  // Obtener estado actual
+  const { data: exp, error: fetchErr } = await supabase
+    .from('expedientes')
+    .select('id, estado, estado_operativo')
+    .eq('id', id)
+    .single();
+
+  if (fetchErr || !exp) {
+    return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Expediente no encontrado' } }, 404);
+  }
+
+  if (exp.estado === 'CERRADO' || exp.estado === 'CANCELADO') {
+    return c.json({ data: null, error: { code: 'EXPEDIENTE_TERMINAL', message: 'No se puede cambiar el estado operativo de un expediente cerrado/cancelado' } }, 409);
+  }
+
+  const estadoAnterior = exp.estado_operativo;
+
+  // Actualizar estado operativo
+  const { error: updateErr } = await supabase
+    .from('expedientes')
+    .update({ estado_operativo: estado_nuevo, updated_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (updateErr) {
+    return c.json({ data: null, error: { code: 'DB_ERROR', message: updateErr.message } }, 500);
+  }
+
+  // Registrar en historial
+  await supabase.from('historial_estados_operativos').insert({
+    expediente_id: id,
+    estado_anterior: estadoAnterior,
+    estado_nuevo: estado_nuevo,
+    mensaje: mensaje.trim(),
+    actor_id: user.id,
+  });
+
+  // Registrar en timeline (comunicaciones) como evento de sistema
+  await supabase.from('comunicaciones').insert({
+    id: crypto.randomUUID(),
+    expediente_id: id,
+    tipo: 'sistema',
+    asunto: 'Cambio de estado operativo',
+    contenido: mensaje.trim(),
+    actor_id: user.id,
+    metadata: {
+      subtipo: 'cambio_estado_operativo',
+      estado_anterior: estadoAnterior,
+      estado_nuevo: estado_nuevo,
+    },
+  });
+
+  return c.json({
+    data: { id, estado_operativo: estado_nuevo, estado_anterior: estadoAnterior },
+    error: null,
+  });
+});
+
+// PATCH /expedientes/:id/fecha-hito - Actualizar fecha próximo hito SLA
+expedientesRoutes.patch('/:id/fecha-hito', async (c) => {
+  const supabase = c.get('adminSupabase');
+  const user = c.get('user');
+  const id = c.req.param('id');
+  const { fecha_proximo_hito, motivo } = await c.req.json<{
+    fecha_proximo_hito: string | null;
+    motivo?: string;
+  }>();
+
+  // Validar formato fecha si no es null
+  if (fecha_proximo_hito !== null) {
+    const parsed = new Date(fecha_proximo_hito);
+    if (isNaN(parsed.getTime())) {
+      return c.json({ data: null, error: { code: 'VALIDATION', message: 'fecha_proximo_hito no es una fecha válida' } }, 422);
+    }
+  }
+
+  const { data: exp, error: fetchErr } = await supabase
+    .from('expedientes')
+    .select('id, estado, fecha_proximo_hito')
+    .eq('id', id)
+    .single();
+
+  if (fetchErr || !exp) {
+    return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Expediente no encontrado' } }, 404);
+  }
+
+  const { error: updateErr } = await supabase
+    .from('expedientes')
+    .update({ fecha_proximo_hito, updated_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (updateErr) {
+    return c.json({ data: null, error: { code: 'DB_ERROR', message: updateErr.message } }, 500);
+  }
+
+  // Registrar en timeline
+  const fechaDisplay = fecha_proximo_hito
+    ? new Date(fecha_proximo_hito).toLocaleDateString('es-ES')
+    : 'eliminada';
+  await supabase.from('comunicaciones').insert({
+    id: crypto.randomUUID(),
+    expediente_id: id,
+    tipo: 'sistema',
+    asunto: 'Fecha hito SLA actualizada',
+    contenido: motivo || `Próximo hito: ${fechaDisplay}`,
+    actor_id: user.id,
+    metadata: {
+      subtipo: 'cambio_fecha_hito',
+      fecha_anterior: exp.fecha_proximo_hito,
+      fecha_nueva: fecha_proximo_hito,
+    },
+  });
+
+  return c.json({
+    data: { id, fecha_proximo_hito },
+    error: null,
+  });
+});
+
+// GET /expedientes/:id/historial-operativo - Historial de estados operativos
+expedientesRoutes.get('/:id/historial-operativo', async (c) => {
+  const supabase = c.get('supabase');
+  const id = c.req.param('id');
+
+  const { data, error } = await supabase
+    .from('historial_estados_operativos')
+    .select('*')
+    .eq('expediente_id', id)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return c.json({ data: null, error: { code: 'DB_ERROR', message: error.message } }, 500);
+  }
+
+  return c.json({ data, error: null });
 });
 
 // GET /expedientes/:id/historial - Historial de estados

@@ -58,6 +58,19 @@ export const COCKPIT_MODULES: CockpitModuleConfig[] = [
     ],
     status: 'implemented',
   },
+  {
+    id: 'tareas_caducadas',
+    label: 'Tareas Caducadas',
+    path: '/tareas-caducadas',
+    icon: 'Clock',
+    feedKey: 'tareas_caducadas',
+    variant: 'orange',
+    quickFilters: [
+      { label: 'Vencidas', value: 'vencido' },
+      { label: 'Hoy', value: 'hoy' },
+    ],
+    status: 'partial',
+  },
 ];
 
 // ─── SIDEBAR — GRUPOS Y ENTRADAS ─────────────────────────────────────────────

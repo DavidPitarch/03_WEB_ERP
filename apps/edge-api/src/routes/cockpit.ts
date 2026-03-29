@@ -1,4 +1,6 @@
 import { Hono } from 'hono';
+import { ESTADO_OPERATIVO_LABELS } from '@erp/types';
+import type { EstadoOperativo } from '@erp/types';
 import type { Env } from '../types';
 
 /**
@@ -26,6 +28,10 @@ interface CockpitItem {
   asegurado_nombre?: string;
   direccion_completa?: string;
   detailPath: string;
+  /** Para módulo Tareas Caducadas: indica si está vencido o vence hoy */
+  sla_estado?: 'vencido' | 'hoy';
+  /** Para módulo Tareas Caducadas: fecha de vencimiento formateada */
+  sla_vencimiento?: string;
 }
 
 interface ModuleData {
@@ -38,6 +44,7 @@ interface CockpitFeedResponse {
   asignaciones: ModuleData;
   solicitudes: ModuleData;
   trabajos_no_revisados: ModuleData;
+  tareas_caducadas: ModuleData;
 }
 
 cockpitRoutes.get('/feed', async (c) => {
@@ -170,11 +177,70 @@ cockpitRoutes.get('/feed', async (c) => {
     items:    partesItems.slice(0, 5),
   };
 
+  // ── 4. TAREAS CADUCADAS (SLA hitos vencidos o que vencen hoy) ───────────
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+  // Expedientes con fecha_proximo_hito <= hoy, no cerrados/cancelados
+  const { data: slaData } = await supabase
+    .from('expedientes')
+    .select(`
+      id,
+      numero_expediente,
+      estado_operativo,
+      fecha_proximo_hito,
+      tramitador_id,
+      compania_id,
+      estado
+    `)
+    .not('fecha_proximo_hito', 'is', null)
+    .lte('fecha_proximo_hito', today + 'T23:59:59.999Z')
+    .not('estado', 'in', '("CERRADO","CANCELADO")')
+    .order('fecha_proximo_hito', { ascending: true })
+    .limit(20);
+
+  const { count: totalSla } = await supabase
+    .from('expedientes')
+    .select('id', { count: 'exact', head: true })
+    .not('fecha_proximo_hito', 'is', null)
+    .lte('fecha_proximo_hito', today + 'T23:59:59.999Z')
+    .not('estado', 'in', '("CERRADO","CANCELADO")');
+
+  const slaItems: CockpitItem[] = (slaData ?? []).map((e: any) => {
+    const hitoDate = e.fecha_proximo_hito?.split('T')[0] ?? '';
+    const isVencido = hitoDate < today;
+    const estadoOpLabel = ESTADO_OPERATIVO_LABELS[e.estado_operativo as EstadoOperativo] ?? e.estado_operativo;
+    return {
+      id:              e.id,
+      numero:          e.numero_expediente,
+      tipo:            estadoOpLabel,
+      estado:          e.estado_operativo,
+      etiqueta:        isVencido ? 'vencido' : 'hoy',
+      fecha:           e.fecha_proximo_hito,
+      detailPath:      `/expedientes/${e.id}`,
+      sla_estado:      isVencido ? 'vencido' : 'hoy',
+      sla_vencimiento: new Date(e.fecha_proximo_hito).toLocaleDateString('es-ES'),
+    };
+  });
+
+  // Ordenar: vencidos primero (más antiguos arriba), luego los de hoy
+  slaItems.sort((a, b) => {
+    if (a.sla_estado === 'vencido' && b.sla_estado !== 'vencido') return -1;
+    if (a.sla_estado !== 'vencido' && b.sla_estado === 'vencido') return 1;
+    return (a.fecha ?? '').localeCompare(b.fecha ?? '');
+  });
+
+  const tareas_caducadas: ModuleData = {
+    total:    totalSla ?? slaItems.length,
+    criticos: slaItems.filter((i) => i.sla_estado === 'vencido').length,
+    items:    slaItems.slice(0, 5),
+  };
+
   // ── Respuesta ─────────────────────────────────────────────────────────────
   const feed: CockpitFeedResponse = {
     asignaciones,
     solicitudes,
     trabajos_no_revisados,
+    tareas_caducadas,
   };
 
   return c.json({ data: feed, error: null });
@@ -183,11 +249,13 @@ cockpitRoutes.get('/feed', async (c) => {
 // ── Contadores rápidos (solo totales, sin feed) ─────────────────────────────
 cockpitRoutes.get('/counts', async (c) => {
   const supabase = c.get('supabase');
+  const today = new Date().toISOString().split('T')[0];
 
   const [
     { count: asignaciones },
     { count: solicitudes },
     { count: partes },
+    { count: slaCount },
   ] = await Promise.all([
     supabase
       .from('expedientes')
@@ -201,6 +269,12 @@ cockpitRoutes.get('/counts', async (c) => {
       .from('partes_operario')
       .select('id', { count: 'exact', head: true })
       .eq('validacion_estado', 'pendiente'),
+    supabase
+      .from('expedientes')
+      .select('id', { count: 'exact', head: true })
+      .not('fecha_proximo_hito', 'is', null)
+      .lte('fecha_proximo_hito', today + 'T23:59:59.999Z')
+      .not('estado', 'in', '("CERRADO","CANCELADO")'),
   ]);
 
   return c.json({
@@ -208,6 +282,7 @@ cockpitRoutes.get('/counts', async (c) => {
       asignaciones:          asignaciones ?? 0,
       solicitudes:           solicitudes  ?? 0,
       trabajos_no_revisados: partes       ?? 0,
+      tareas_caducadas:      slaCount     ?? 0,
     },
     error: null,
   });

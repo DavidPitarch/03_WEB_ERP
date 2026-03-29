@@ -21,6 +21,7 @@ import '@/styles/components/alert.css';
 import '@/styles/components/timeline.css';
 import '@/styles/components/card.css';
 import '@/styles/components/cockpit.css';
+import '@/styles/components/estado-operativo.css';
 import '@/styles/components/geo-planning.css';
 
 const queryClient = new QueryClient({

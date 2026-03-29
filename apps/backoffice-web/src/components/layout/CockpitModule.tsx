@@ -27,6 +27,16 @@ function PriorityBadge({ value }: { value?: string }) {
   );
 }
 
+/** Badge de SLA con fecha y color semafórico */
+function SlaBadge({ item }: { item: CockpitFeedItem }) {
+  if (!item.sla_estado) return <PriorityBadge value={item.prioridad ?? item.etiqueta} />;
+  return (
+    <span className={`cockpit-item__badge cockpit-item__badge--sla-${item.sla_estado}`}>
+      {item.sla_vencimiento ?? item.etiqueta}
+    </span>
+  );
+}
+
 export function CockpitModule({ config, data, isLoading }: CockpitModuleProps) {
   const [hoveredItem, setHoveredItem] = useState<CockpitFeedItem | null>(null);
 
@@ -80,7 +90,10 @@ export function CockpitModule({ config, data, isLoading }: CockpitModuleProps) {
               <span className="cockpit-item__info">
                 {[item.tipo, item.localidad].filter(Boolean).join(' · ')}
               </span>
-              <PriorityBadge value={item.prioridad ?? item.etiqueta} />
+              {item.sla_estado
+                ? <SlaBadge item={item} />
+                : <PriorityBadge value={item.prioridad ?? item.etiqueta} />
+              }
             </Link>
           ))
         )}

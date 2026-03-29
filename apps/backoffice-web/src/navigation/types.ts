@@ -93,9 +93,9 @@ export interface CockpitModuleConfig {
   /** Nombre de icono de lucide-react */
   icon: string;
   /** Clave en el feed del cockpit (respuesta de /api/v1/cockpit/feed) */
-  feedKey: 'asignaciones' | 'solicitudes' | 'trabajos_no_revisados';
+  feedKey: 'asignaciones' | 'solicitudes' | 'trabajos_no_revisados' | 'tareas_caducadas';
   /** Variante de color del módulo */
-  variant: 'blue' | 'amber' | 'red' | 'green';
+  variant: 'blue' | 'amber' | 'red' | 'green' | 'orange';
   /** Filtros rápidos disponibles en el módulo */
   quickFilters: Array<{ label: string; value: string }>;
   status: ImplementationStatus;
@@ -118,6 +118,10 @@ export interface CockpitFeedItem {
   direccion_completa?: string;
   /** Ruta directa al detalle (deep link al expediente) */
   detailPath: string;
+  /** Para Tareas Caducadas: indica si SLA vencido o vence hoy */
+  sla_estado?: 'vencido' | 'hoy';
+  /** Para Tareas Caducadas: fecha de vencimiento formateada (dd/mm/yyyy) */
+  sla_vencimiento?: string;
 }
 
 /**
@@ -136,6 +140,7 @@ export interface CockpitFeed {
   asignaciones: CockpitModuleData;
   solicitudes: CockpitModuleData;
   trabajos_no_revisados: CockpitModuleData;
+  tareas_caducadas: CockpitModuleData;
 }
 
 /**

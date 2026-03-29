@@ -5,10 +5,10 @@
    ═══════════════════════════════════════════════════════ */
 
 
-/* ── Contenedor de los 3 módulos (compacto) ────────────── */
+/* ── Contenedor de los 4 módulos (compacto) ────────────── */
 .top-cockpit {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: var(--space-1);
   padding: var(--space-1) var(--space-2);
   background: var(--color-bg-subtle);
@@ -32,10 +32,11 @@
 }
 
 /* Acento lateral por variante — más fino */
-.cockpit-module--blue  { border-left: 2px solid var(--blue-500);   }
-.cockpit-module--amber { border-left: 2px solid var(--amber-500);  }
-.cockpit-module--red   { border-left: 2px solid var(--red-500);    }
-.cockpit-module--green { border-left: 2px solid var(--green-500);  }
+.cockpit-module--blue   { border-left: 2px solid var(--blue-500);   }
+.cockpit-module--amber  { border-left: 2px solid var(--amber-500);  }
+.cockpit-module--red    { border-left: 2px solid var(--red-500);    }
+.cockpit-module--green  { border-left: 2px solid var(--green-500);  }
+.cockpit-module--orange { border-left: 2px solid var(--orange-500); }
 
 /* ── Header ultra-compacto del módulo ──────────────────── */
 .cockpit-module__header {
@@ -56,15 +57,17 @@
   justify-content: center;
   flex-shrink: 0;
 }
-.cockpit-module--blue  .cockpit-module__icon { background: var(--blue-50);  color: var(--blue-600);  }
-.cockpit-module--amber .cockpit-module__icon { background: var(--amber-50); color: var(--amber-600); }
-.cockpit-module--red   .cockpit-module__icon { background: var(--red-50);   color: var(--red-600);   }
-.cockpit-module--green .cockpit-module__icon { background: var(--green-50); color: var(--green-600); }
+.cockpit-module--blue   .cockpit-module__icon { background: var(--blue-50);   color: var(--blue-600);   }
+.cockpit-module--amber  .cockpit-module__icon { background: var(--amber-50);  color: var(--amber-600);  }
+.cockpit-module--red    .cockpit-module__icon { background: var(--red-50);    color: var(--red-600);    }
+.cockpit-module--green  .cockpit-module__icon { background: var(--green-50);  color: var(--green-600);  }
+.cockpit-module--orange .cockpit-module__icon { background: var(--orange-50); color: var(--orange-600); }
 
-[data-theme="dark"] .cockpit-module--blue  .cockpit-module__icon { background: color-mix(in srgb, var(--blue-500) 15%, transparent);  }
-[data-theme="dark"] .cockpit-module--amber .cockpit-module__icon { background: color-mix(in srgb, var(--amber-500) 15%, transparent); }
-[data-theme="dark"] .cockpit-module--red   .cockpit-module__icon { background: color-mix(in srgb, var(--red-500) 15%, transparent);   }
-[data-theme="dark"] .cockpit-module--green .cockpit-module__icon { background: color-mix(in srgb, var(--green-500) 15%, transparent); }
+[data-theme="dark"] .cockpit-module--blue   .cockpit-module__icon { background: color-mix(in srgb, var(--blue-500) 15%, transparent);   }
+[data-theme="dark"] .cockpit-module--amber  .cockpit-module__icon { background: color-mix(in srgb, var(--amber-500) 15%, transparent);  }
+[data-theme="dark"] .cockpit-module--red    .cockpit-module__icon { background: color-mix(in srgb, var(--red-500) 15%, transparent);    }
+[data-theme="dark"] .cockpit-module--green  .cockpit-module__icon { background: color-mix(in srgb, var(--green-500) 15%, transparent);  }
+[data-theme="dark"] .cockpit-module--orange .cockpit-module__icon { background: color-mix(in srgb, var(--orange-500) 15%, transparent); }
 
 .cockpit-module__title-group { flex: 1; min-width: 0; }
 .cockpit-module__title {
@@ -91,10 +94,11 @@
   font-weight: var(--weight-bold);
   line-height: 1;
 }
-.cockpit-module--blue  .cockpit-module__count { color: var(--blue-600);  }
-.cockpit-module--amber .cockpit-module__count { color: var(--amber-600); }
-.cockpit-module--red   .cockpit-module__count { color: var(--red-600);   }
-.cockpit-module--green .cockpit-module__count { color: var(--green-600); }
+.cockpit-module--blue   .cockpit-module__count { color: var(--blue-600);   }
+.cockpit-module--amber  .cockpit-module__count { color: var(--amber-600);  }
+.cockpit-module--red    .cockpit-module__count { color: var(--red-600);    }
+.cockpit-module--green  .cockpit-module__count { color: var(--green-600);  }
+.cockpit-module--orange .cockpit-module__count { color: var(--orange-600); }
 
 .cockpit-module__critical {
   font-size: 10px;
@@ -170,13 +174,19 @@
 .cockpit-item__badge--alta     { background: var(--amber-100); color: var(--amber-700); }
 .cockpit-item__badge--media    { background: var(--blue-100);  color: var(--blue-700);  }
 .cockpit-item__badge--baja     { background: var(--slate-100); color: var(--slate-600); }
-.cockpit-item__badge--pendiente { background: var(--amber-100); color: var(--amber-700); }
+.cockpit-item__badge--pendiente  { background: var(--amber-100); color: var(--amber-700); }
 
-[data-theme="dark"] .cockpit-item__badge--urgente  { background: color-mix(in srgb, var(--red-600) 20%, transparent);   color: var(--red-300);   }
-[data-theme="dark"] .cockpit-item__badge--alta     { background: color-mix(in srgb, var(--amber-500) 20%, transparent); color: var(--amber-300); }
-[data-theme="dark"] .cockpit-item__badge--media    { background: color-mix(in srgb, var(--blue-500) 20%, transparent);  color: var(--blue-300);  }
-[data-theme="dark"] .cockpit-item__badge--baja     { background: color-mix(in srgb, var(--slate-500) 20%, transparent); color: var(--slate-300); }
-[data-theme="dark"] .cockpit-item__badge--pendiente { background: color-mix(in srgb, var(--amber-500) 20%, transparent); color: var(--amber-300); }
+/* SLA badges — Tareas Caducadas */
+.cockpit-item__badge--sla-vencido { background: var(--red-100);    color: var(--red-700);    font-weight: var(--weight-semibold); }
+.cockpit-item__badge--sla-hoy     { background: var(--orange-100); color: var(--orange-700); font-weight: var(--weight-semibold); }
+
+[data-theme="dark"] .cockpit-item__badge--urgente    { background: color-mix(in srgb, var(--red-600) 20%, transparent);    color: var(--red-300);    }
+[data-theme="dark"] .cockpit-item__badge--alta       { background: color-mix(in srgb, var(--amber-500) 20%, transparent);  color: var(--amber-300);  }
+[data-theme="dark"] .cockpit-item__badge--media      { background: color-mix(in srgb, var(--blue-500) 20%, transparent);   color: var(--blue-300);   }
+[data-theme="dark"] .cockpit-item__badge--baja       { background: color-mix(in srgb, var(--slate-500) 20%, transparent);  color: var(--slate-300);  }
+[data-theme="dark"] .cockpit-item__badge--pendiente  { background: color-mix(in srgb, var(--amber-500) 20%, transparent);  color: var(--amber-300);  }
+[data-theme="dark"] .cockpit-item__badge--sla-vencido { background: color-mix(in srgb, var(--red-500) 20%, transparent);   color: var(--red-300);    }
+[data-theme="dark"] .cockpit-item__badge--sla-hoy     { background: color-mix(in srgb, var(--orange-500) 20%, transparent); color: var(--orange-300); }
 
 /* ── Tooltip de asegurado (módulo Solicitudes/Avisos) ──── */
 .cockpit-module__tooltip {
@@ -243,12 +253,13 @@
 /* ── Responsive ────────────────────────────────────────── */
 @media (max-width: 1279px) {
   .top-cockpit {
+    grid-template-columns: repeat(2, 1fr);
     gap: var(--space-1);
     padding: var(--space-1) var(--space-1);
   }
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 767px) {
   .top-cockpit {
     grid-template-columns: 1fr;
   }

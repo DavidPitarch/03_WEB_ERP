@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import type { Expediente, PaginatedResult, ExpedienteFilters } from '@erp/types';
+import type { Expediente, PaginatedResult, ExpedienteFilters, EstadoOperativo } from '@erp/types';
 
 export function useExpedientes(filters: ExpedienteFilters & { page?: number; per_page?: number } = {}) {
   const params = new URLSearchParams();
@@ -51,6 +51,32 @@ export function useTransicionEstado() {
       qc.invalidateQueries({ queryKey: ['expediente', vars.id] });
       qc.invalidateQueries({ queryKey: ['expediente-timeline', vars.id] });
       qc.invalidateQueries({ queryKey: ['expedientes'] });
+    },
+  });
+}
+
+export function useCambioEstadoOperativo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, estado_nuevo, mensaje }: { id: string; estado_nuevo: EstadoOperativo; mensaje: string }) =>
+      api.patch(`/expedientes/${id}/estado-operativo`, { estado_nuevo, mensaje }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['expediente', vars.id] });
+      qc.invalidateQueries({ queryKey: ['expediente-timeline', vars.id] });
+      qc.invalidateQueries({ queryKey: ['cockpit-feed'] });
+    },
+  });
+}
+
+export function useActualizarFechaHito() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, fecha_proximo_hito, motivo }: { id: string; fecha_proximo_hito: string | null; motivo?: string }) =>
+      api.patch(`/expedientes/${id}/fecha-hito`, { fecha_proximo_hito, motivo }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['expediente', vars.id] });
+      qc.invalidateQueries({ queryKey: ['expediente-timeline', vars.id] });
+      qc.invalidateQueries({ queryKey: ['cockpit-feed'] });
     },
   });
 }
